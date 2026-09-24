@@ -1,0 +1,74 @@
+.arena-root {
+  min-height: 100vh;
+  position: relative;
+  overflow: hidden;
+  background: #000;
+}
+
+.arena-bg {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse at 20% 0%, rgba(225, 6, 0, 0.16), transparent 42%),
+    radial-gradient(ellipse at 80% 100%, rgba(26, 76, 255, 0.12), transparent 40%),
+    linear-gradient(180deg, #0a0a0a, #000 70%);
+}
+
+.arena-stage {
+  position: relative;
+  z-index: 1;
+  min-height: 100vh;
+  height: 100vh;
+  height: 100dvh;
+  display: grid;
+  place-items: stretch;
+  padding: 0;
+}
+
+.arena-gate {
+  position: relative;
+  z-index: 2;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  text-align: center;
+}
+
+.arena-gate h1 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(2.4rem, 6vw, 4rem);
+  letter-spacing: 0.1em;
+}
+
+.arena-idle {
+  text-align: center;
+  place-self: center;
+}
+
+.arena-idle-title {
+  font-family: var(--font-display);
+  font-size: clamp(3rem, 9vw, 7rem);
+  letter-spacing: 0.08em;
+}
+
+.arena-idle-sub {
+  color: rgba(255, 255, 255, 0.45);
+  letter-spacing: 0.4em;
+  font-weight: 800;
+  margin-top: 0.5rem;
+}
+
+.arena-hud {
+  position: absolute;
+  right: 1rem;
+  bottom: 1rem;
+  z-index: 30;
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  opacity: 0.55;
+}

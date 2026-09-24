@@ -1,0 +1,304 @@
+.scoreboard {
+  --home: #e10600;
+  --away: #1a4cff;
+  --led: #ff1f1f;
+  --led-soft: #ff4a2b;
+  position: relative;
+  width: min(920px, 92vw);
+  padding: clamp(1.4rem, 3.5vw, 2.6rem) clamp(1.5rem, 4vw, 3rem);
+  color: #fff;
+  text-align: center;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #050505;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  isolation: isolate;
+}
+
+.scoreboard.broadcast {
+  width: 100%;
+  height: 100%;
+  min-height: 100vh;
+  min-height: 100dvh;
+  border-radius: 0;
+  border: none;
+  padding: clamp(2vh, 4vh, 5vh) clamp(3vw, 5vw, 6vw);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: stretch;
+  box-shadow: none;
+  background:
+    radial-gradient(ellipse at 50% 35%, rgba(255, 48, 16, 0.14), transparent 48%),
+    linear-gradient(180deg, #0a0a0a, #000 75%);
+}
+
+.sb-glow {
+  pointer-events: none;
+  position: absolute;
+  inset: -20%;
+  background:
+    radial-gradient(circle at 50% 42%, rgba(255, 48, 16, 0.16), transparent 42%),
+    radial-gradient(circle at 50% 70%, rgba(255, 30, 10, 0.1), transparent 50%);
+  z-index: 0;
+}
+
+.sb-period,
+.sb-clock-row,
+.sb-score-row,
+.sb-team-labels,
+.sb-status {
+  position: relative;
+  z-index: 1;
+}
+
+.sb-period {
+  margin: 0 0 clamp(0.6rem, 1.5vw, 1rem);
+  font-size: clamp(0.85rem, 1.6vw, 1.15rem);
+  font-weight: 800;
+  letter-spacing: 0.35em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.scoreboard.broadcast .sb-period {
+  margin-bottom: clamp(1.2vh, 2.5vh, 3vh);
+  font-size: clamp(1.1rem, 2.8vw, 2.2rem);
+  letter-spacing: 0.45em;
+}
+
+.sb-clock-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: clamp(1rem, 3vw, 2rem);
+  margin-bottom: clamp(0.85rem, 2vw, 1.4rem);
+}
+
+.scoreboard.broadcast .sb-clock-row {
+  gap: clamp(2vw, 5vw, 6vw);
+  margin-bottom: clamp(1.5vh, 3.5vh, 4.5vh);
+  max-width: 92vw;
+  margin-inline: auto;
+  width: 100%;
+}
+
+.sb-crest {
+  width: clamp(52px, 7vw, 84px);
+  height: clamp(52px, 7vw, 84px);
+  border-radius: 14px;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  background: rgba(255, 255, 255, 0.04);
+  border: 2px solid rgba(255, 255, 255, 0.12);
+  font-family: var(--font-display);
+  font-size: clamp(0.9rem, 1.8vw, 1.35rem);
+  font-weight: 900;
+  flex-shrink: 0;
+}
+
+.scoreboard.broadcast .sb-crest {
+  width: clamp(88px, 12vw, 160px);
+  height: clamp(88px, 12vw, 160px);
+  border-radius: 22px;
+  border-width: 3px;
+  font-size: clamp(1.4rem, 3vw, 2.4rem);
+}
+
+.sb-crest.home {
+  border-color: color-mix(in srgb, var(--home) 75%, #fff 10%);
+  box-shadow: 0 0 18px color-mix(in srgb, var(--home) 40%, transparent);
+}
+
+.sb-crest.away {
+  border-color: color-mix(in srgb, var(--away) 75%, #fff 10%);
+  box-shadow: 0 0 18px color-mix(in srgb, var(--away) 40%, transparent);
+}
+
+.sb-crest img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.sb-clock {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 0.08em;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.sb-clock-digits {
+  font-family: var(--font-display), "Arena Display", Impact, sans-serif;
+  font-size: clamp(3.6rem, 11vw, 7.5rem);
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  color: #f5f5f5;
+  text-shadow:
+    0 0 8px rgba(255, 255, 255, 0.35),
+    0 0 24px rgba(255, 255, 255, 0.12);
+}
+
+.scoreboard.broadcast .sb-clock-digits {
+  font-size: clamp(5rem, 14vw, 12rem);
+}
+
+.sb-clock-colon {
+  font-family: var(--font-display), Impact, sans-serif;
+  font-size: clamp(3.2rem, 10vw, 6.8rem);
+  font-weight: 900;
+  color: var(--led);
+  text-shadow:
+    0 0 10px rgba(255, 40, 20, 0.95),
+    0 0 28px rgba(255, 50, 20, 0.55),
+    0 0 48px rgba(255, 40, 10, 0.3);
+  animation: colon-pulse 1s steps(1) infinite;
+  transform: translateY(-0.04em);
+}
+
+.scoreboard.broadcast .sb-clock-colon {
+  font-size: clamp(4.5rem, 12.5vw, 10.5rem);
+}
+
+@keyframes colon-pulse {
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0.35;
+  }
+}
+
+.sb-score-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(0.85rem, 2.5vw, 1.6rem);
+  font-variant-numeric: tabular-nums;
+}
+
+.sb-score-num {
+  font-family: var(--font-display), Impact, sans-serif;
+  font-size: clamp(4.2rem, 13vw, 8.5rem);
+  font-weight: 900;
+  line-height: 0.9;
+  color: var(--led);
+  letter-spacing: 0.02em;
+  text-shadow:
+    0 0 12px rgba(255, 35, 15, 0.95),
+    0 0 32px rgba(255, 45, 15, 0.55),
+    0 0 60px rgba(255, 40, 10, 0.28);
+}
+
+.scoreboard.broadcast .sb-score-num {
+  font-size: clamp(7rem, 22vw, 18rem);
+}
+
+.sb-score-bar {
+  font-family: var(--font-display), Impact, sans-serif;
+  font-size: clamp(3rem, 9vw, 5.5rem);
+  font-weight: 300;
+  color: rgba(255, 255, 255, 0.92);
+  line-height: 1;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.25);
+}
+
+.scoreboard.broadcast .sb-score-bar {
+  font-size: clamp(5rem, 14vw, 11rem);
+}
+
+.scoreboard.broadcast .sb-score-row {
+  gap: clamp(2vw, 4vw, 5vw);
+  flex: 0 0 auto;
+}
+
+.sb-team-labels {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: clamp(0.75rem, 1.8vw, 1.15rem);
+  padding: 0 clamp(0.2rem, 1vw, 0.6rem);
+}
+
+.scoreboard.broadcast .sb-team-labels {
+  margin-top: clamp(2vh, 4vh, 5vh);
+  max-width: 92vw;
+  margin-inline: auto;
+  width: 100%;
+  padding: 0 clamp(1vw, 3vw, 4vw);
+}
+
+.sb-team-labels span {
+  font-size: clamp(0.75rem, 1.4vw, 1rem);
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.scoreboard.broadcast .sb-team-labels span {
+  font-size: clamp(1.1rem, 3vw, 2.4rem);
+  letter-spacing: 0.28em;
+}
+
+.sb-team-labels .home {
+  color: color-mix(in srgb, var(--home) 55%, #fff 45%);
+}
+
+.sb-team-labels .away {
+  color: color-mix(in srgb, var(--away) 55%, #fff 45%);
+}
+
+.sb-status {
+  margin-top: 0.45rem;
+  font-size: 0.65rem;
+  letter-spacing: 0.2em;
+  color: var(--led-soft);
+  font-weight: 800;
+}
+
+/* Compact preview (admin) */
+.scoreboard.compact {
+  width: 100%;
+  padding: 0.85rem 1rem 1rem;
+  border-radius: 12px;
+}
+
+.scoreboard.compact .sb-period {
+  font-size: 0.7rem;
+  letter-spacing: 0.28em;
+  margin-bottom: 0.45rem;
+}
+
+.scoreboard.compact .sb-crest {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  font-size: 0.7rem;
+}
+
+.scoreboard.compact .sb-clock-row {
+  gap: 0.75rem;
+  margin-bottom: 0.45rem;
+}
+
+.scoreboard.compact .sb-clock-digits,
+.scoreboard.compact .sb-clock-colon {
+  font-size: 2rem;
+}
+
+.scoreboard.compact .sb-score-num {
+  font-size: 2.4rem;
+}
+
+.scoreboard.compact .sb-score-bar {
+  font-size: 1.6rem;
+}
+
+.scoreboard.compact .sb-team-labels {
+  display: none;
+}

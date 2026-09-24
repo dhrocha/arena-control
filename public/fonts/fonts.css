@@ -1,0 +1,29 @@
+/* Local display fonts — no external CDN */
+@font-face {
+  font-family: "Arena Display";
+  src: local("Impact"), local("Haettenschweiler"), local("Arial Black"), local("sans-serif");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Arena Sans";
+  src: local("Segoe UI"), local("Helvetica Neue"), local("Arial"), local("sans-serif");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Arena Sans";
+  src: local("Segoe UI Bold"), local("Helvetica Neue Bold"), local("Arial Bold"), local("sans-serif");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  --font-display: "Arena Display", Impact, "Arial Black", sans-serif;
+  --font-sans: "Arena Sans", "Segoe UI", system-ui, sans-serif;
+}
