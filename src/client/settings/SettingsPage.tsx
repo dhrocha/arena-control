@@ -140,6 +140,24 @@ export function SettingsPage() {
             />
           </div>
           <div className="field">
+            <label>Patrocínio idle (s)</label>
+            <input
+              type="number"
+              value={settings.idleSponsorSeconds ?? 180}
+              onChange={(e) => update("idleSponsorSeconds", Number(e.target.value))}
+            />
+            <small>Tempo de cada arte na tela sem jogos / botão manual.</small>
+          </div>
+          <div className="field">
+            <label>Patrocínio intervalo (s)</label>
+            <input
+              type="number"
+              value={settings.halftimeSponsorSeconds ?? 15}
+              onChange={(e) => update("halftimeSponsorSeconds", Number(e.target.value))}
+            />
+            <small>Tempo de cada arte no carousel do intervalo.</small>
+          </div>
+          <div className="field">
             <label>Tema</label>
             <select value={settings.theme} onChange={(e) => update("theme", e.target.value)}>
               <option value="dark">Dark</option>

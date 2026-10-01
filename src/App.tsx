@@ -6,6 +6,7 @@ import { ArenaPage } from "./client/arena/ArenaPage";
 import { SetupPage } from "./client/setup/SetupPage";
 import { SettingsPage } from "./client/settings/SettingsPage";
 import { EffectsPage } from "./client/effects/EffectsPage";
+import { SponsorsPage } from "./client/sponsors/SponsorsPage";
 
 export function App() {
   return (
@@ -18,6 +19,7 @@ export function App() {
         <Route path="/setup" element={<SetupPage />} />
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="/effects" element={<EffectsPage />} />
+        <Route path="/sponsors" element={<SponsorsPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </div>

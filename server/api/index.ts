@@ -7,7 +7,8 @@ import type { ArenaDatabase } from "../db/database.ts";
 import { UPLOADS_DIR } from "../db/database.ts";
 import type { MatchEngine } from "../domain/MatchEngine.ts";
 import { eventBus } from "../domain/EventBus.ts";
-import type { Settings, Team, Player, Effect } from "../../shared/types/index.ts";
+import type { Settings, Team, Player, Effect, Sponsor, SponsorMediaType } from "../../shared/types/index.ts";
+import { normalizeSponsorSlots } from "../../shared/sponsors/playlist.ts";
 
 const storage = multer.diskStorage({
   destination: (_req, _file, cb) => cb(null, UPLOADS_DIR),
@@ -21,6 +22,17 @@ const upload = multer({
   storage,
   limits: { fileSize: 5 * 1024 * 1024 },
 });
+
+const mediaUpload = multer({
+  storage,
+  limits: { fileSize: 50 * 1024 * 1024 },
+});
+
+function detectMediaType(filename: string, mimetype?: string): SponsorMediaType {
+  const lower = `${filename} ${mimetype ?? ""}`.toLowerCase();
+  if (/\.(mp4|webm|mov|m4v)(\?|$)/.test(lower) || lower.includes("video/")) return "video";
+  return "image";
+}
 
 export function createApiRouter(db: ArenaDatabase, engine: MatchEngine): Express {
   const api = express();
@@ -159,6 +171,75 @@ export function createApiRouter(db: ArenaDatabase, engine: MatchEngine): Express
     }
     eventBus.emit("STATE_CHANGED", null);
     res.json(player);
+  });
+
+  api.get("/sponsors", (_req, res) => {
+    res.json(db.listSponsors());
+  });
+
+  api.post("/sponsors", (req, res) => {
+    const body = req.body as Partial<Sponsor>;
+    if (!body.name) {
+      res.status(400).json({ error: "Nome obrigatório" });
+      return;
+    }
+    const sponsor = db.createSponsor({
+      name: body.name,
+      mediaUrl: body.mediaUrl ?? null,
+      mediaType: body.mediaType === "video" ? "video" : "image",
+      tier: body.tier === "master" ? "master" : "standard",
+      slots: normalizeSponsorSlots(body.slots),
+      enabled: body.enabled ?? true,
+    });
+    eventBus.emit("STATE_CHANGED", null);
+    engine.refreshIdleSponsors();
+    res.status(201).json(sponsor);
+  });
+
+  api.put("/sponsors/:id", (req, res) => {
+    const body = req.body as Partial<Sponsor>;
+    const patch: Partial<Sponsor> = { ...body };
+    if (body.slots !== undefined) patch.slots = normalizeSponsorSlots(body.slots);
+    if (body.tier !== undefined) patch.tier = body.tier === "master" ? "master" : "standard";
+    if (body.mediaType !== undefined) {
+      patch.mediaType = body.mediaType === "video" ? "video" : "image";
+    }
+    const sponsor = db.updateSponsor(req.params.id, patch);
+    if (!sponsor) {
+      res.status(404).json({ error: "Patrocinador não encontrado" });
+      return;
+    }
+    eventBus.emit("STATE_CHANGED", null);
+    engine.refreshIdleSponsors();
+    res.json(sponsor);
+  });
+
+  api.delete("/sponsors/:id", (req, res) => {
+    const ok = db.deleteSponsor(req.params.id);
+    if (!ok) {
+      res.status(404).json({ error: "Patrocinador não encontrado" });
+      return;
+    }
+    eventBus.emit("STATE_CHANGED", null);
+    engine.refreshIdleSponsors();
+    res.json({ ok: true });
+  });
+
+  api.post("/sponsors/:id/media", mediaUpload.single("media"), (req, res) => {
+    if (!req.file) {
+      res.status(400).json({ error: "Arquivo ausente" });
+      return;
+    }
+    const mediaUrl = `/uploads/${req.file.filename}`;
+    const mediaType = detectMediaType(req.file.filename, req.file.mimetype);
+    const sponsor = db.updateSponsor(req.params.id, { mediaUrl, mediaType });
+    if (!sponsor) {
+      res.status(404).json({ error: "Patrocinador não encontrado" });
+      return;
+    }
+    eventBus.emit("STATE_CHANGED", null);
+    engine.refreshIdleSponsors();
+    res.json(sponsor);
   });
 
   api.get("/matches", (_req, res) => {

@@ -191,6 +191,15 @@
   line-height: 0.95;
 }
 
+.fx-mvp-badge.craque {
+  font-size: clamp(1.4rem, 4.5vw, 3.2rem);
+  letter-spacing: 0.12em;
+  padding: 0.35rem 0.85rem;
+  border: 2px solid rgba(245, 197, 24, 0.7);
+  border-radius: 8px;
+  color: #f5c518;
+}
+
 .fx-score-row {
   display: flex;
   gap: clamp(1.5rem, 4vw, 3rem);

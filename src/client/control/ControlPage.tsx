@@ -238,7 +238,7 @@ export function ControlPage() {
           <button type="button" className="btn-ghost" onClick={() => setScreen("home")}>
             ←
           </button>
-          <h1>MVP</h1>
+          <h1>Craque da Partida</h1>
           <Conn connected={connected} />
         </header>
         <div className="ctrl-list">
@@ -372,7 +372,7 @@ export function ControlPage() {
               <section className="ctrl-row">
                 {isGameDay && (
                   <button type="button" className="btn-lg" onClick={() => setScreen("mvp")}>
-                    MVP
+                    CRAQUE
                   </button>
                 )}
                 <button type="button" className="btn-primary btn-lg" onClick={() => setScreen("new-match")}>
@@ -552,7 +552,7 @@ export function ControlPage() {
                 )}
                 {isGameDay && match.status !== "setup" && (
                   <button type="button" onClick={() => setScreen("mvp")}>
-                    MVP
+                    CRAQUE
                   </button>
                 )}
               </section>
@@ -634,6 +634,12 @@ export function ControlPage() {
                       run: () => safeSend({ type: "SHOW_SCOREBOARD" }),
                     },
                     {
+                      key: "sponsors",
+                      label: "PATROCÍNIOS",
+                      disabled: false,
+                      run: () => safeSend({ type: "SHOW_SPONSORS" }),
+                    },
+                    {
                       key: "clear",
                       label: "LIMPAR",
                       disabled: false,
@@ -648,7 +654,38 @@ export function ControlPage() {
               </div>
             </section>
           )}
+
+          {(isVolleyball || !isGameDay || match?.status === "finished" || !match) && (
+            <section className="ctrl-effects">
+              <h2>TELA</h2>
+              <div className="ctrl-effects-grid">
+                <button type="button" onClick={() => safeSend({ type: "SHOW_SCOREBOARD" })}>
+                  PLACAR
+                </button>
+                <button type="button" onClick={() => safeSend({ type: "SHOW_SPONSORS" })}>
+                  PATROCÍNIOS
+                </button>
+                <button type="button" onClick={() => safeSend({ type: "CANCEL_EFFECT" })}>
+                  LIMPAR
+                </button>
+              </div>
+            </section>
+          )}
         </div>
+      )}
+
+      {!match && (
+        <section className="ctrl-effects" style={{ marginTop: "1rem" }}>
+          <h2>TELA</h2>
+          <div className="ctrl-effects-grid">
+            <button type="button" onClick={() => safeSend({ type: "SHOW_SPONSORS" })}>
+              PATROCÍNIOS
+            </button>
+            <button type="button" onClick={() => safeSend({ type: "CANCEL_EFFECT" })}>
+              LIMPAR
+            </button>
+          </div>
+        </section>
       )}
 
       <nav className="ctrl-nav">

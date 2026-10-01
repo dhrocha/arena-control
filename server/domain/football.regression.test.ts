@@ -172,7 +172,7 @@ describe("regressão futebol", () => {
       effects: unknown[];
       settings: unknown;
     };
-    expect(backup.version).toBe(4);
+    expect(backup.version).toBe(5);
     expect(backup.matches[0].sport).toBe("FOOTBALL");
 
     // simula backup legado sem sport

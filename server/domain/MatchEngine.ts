@@ -10,11 +10,19 @@ import type {
   MatchStatus,
   NetworkInfo,
   Settings,
+  SponsorCarouselMode,
+  SponsorDisplayState,
+  SponsorSlot,
   Sport,
   Team,
   VolleyballMatchState,
 } from "../../shared/types/index.ts";
 import { resolveSport } from "../../shared/types/index.ts";
+import {
+  buildWeightedPlaylist,
+  pickWeightedSponsor,
+  sponsorsForSlot,
+} from "../../shared/sponsors/playlist.ts";
 import {
   scoresFromVolleyballState,
   volleyballRules,
@@ -46,15 +54,22 @@ const EFFECT_HINT_MAP: Record<VolleyballEffectHint, EffectType> = {
 export class MatchEngine {
   private activeEffect: EffectPayload | null = null;
   private effectTimer: ReturnType<typeof setTimeout> | null = null;
+  private effectQueue: Array<{ type: EffectType; extras: Partial<EffectPayload> }> = [];
+  private pendingAfterEffect: (() => void) | null = null;
   private devices = new Map<string, ClientInfo>();
   private activeControllerId: string | null = null;
   private countdownTimer: ReturnType<typeof setInterval> | null = null;
   private arenaView: ArenaView = "idle";
+  private sponsorDisplay: SponsorDisplayState | null = null;
+  private sponsorTimer: ReturnType<typeof setTimeout> | null = null;
+  private timeoutSponsorId: string | null = null;
   private volleyballUndoStack: VolleyballUndoSnapshot[] = [];
   private lastVolleyballPointEventId: string | null = null;
   private timeoutTimer: ReturnType<typeof setTimeout> | null = null;
 
-  constructor(private readonly db: ArenaDatabase) {}
+  constructor(private readonly db: ArenaDatabase) {
+    queueMicrotask(() => this.ensureIdleSponsorCarousel());
+  }
 
   getNetwork(): NetworkInfo {
     const settings = this.db.getSettings();
@@ -67,6 +82,7 @@ export class MatchEngine {
       settings: this.db.getSettings(),
       teams: this.db.listTeams(),
       players: this.db.listPlayers(),
+      sponsors: this.db.listSponsors(),
       match,
       events: match ? this.db.listEvents(match.id) : [],
       effects: this.db.listEffects(),
@@ -76,6 +92,8 @@ export class MatchEngine {
       network: this.getNetwork(),
       activeEffect: this.activeEffect,
       arenaView: this.arenaView,
+      sponsorDisplay: this.sponsorDisplay,
+      timeoutSponsorId: this.timeoutSponsorId,
     };
   }
 
@@ -199,10 +217,12 @@ export class MatchEngine {
     });
 
     this.clearEffect();
+    this.stopSponsorCarousel();
     this.arenaView = "scoreboard";
     this.volleyballUndoStack = [];
     this.lastVolleyballPointEventId = null;
     this.clearTimeoutTimer();
+    this.timeoutSponsorId = null;
     eventBus.emit("STATE_CHANGED", null);
     return match;
   }
@@ -349,7 +369,17 @@ export class MatchEngine {
     });
     this.arenaView = "scoreboard";
     if (match.mode === "gameday") {
-      this.triggerEffect("HALF_TIME", { homeScore: match.homeScore, awayScore: match.awayScore });
+      const triggered = this.triggerEffect("HALF_TIME", {
+        homeScore: match.homeScore,
+        awayScore: match.awayScore,
+      });
+      if (triggered) {
+        this.pendingAfterEffect = () => this.startSponsorCarousel("halftime");
+      } else {
+        this.startSponsorCarousel("halftime");
+      }
+    } else {
+      this.startSponsorCarousel("halftime");
     }
     eventBus.emit("STATE_CHANGED", null);
   }
@@ -359,6 +389,7 @@ export class MatchEngine {
     if (match.status !== "halftime") {
       throw new Error("Segundo tempo só após o intervalo");
     }
+    this.stopSponsorCarousel();
     this.resumeMatch();
   }
 
@@ -517,11 +548,34 @@ export class MatchEngine {
     });
 
     if (match.mode === "gameday") {
-      const effectType = match.sport === "VOLLEYBALL" ? "VOLLEY_MVP" : "MVP";
-      const triggered = this.triggerEffect(effectType, { teamId: player.teamId, playerId });
-      if (!triggered && effectType === "VOLLEY_MVP") {
-        this.triggerEffect("MVP", { teamId: player.teamId, playerId });
+      this.stopSponsorCarousel();
+      const mvpSponsor = pickWeightedSponsor(sponsorsForSlot(this.db.listSponsors(), "mvp"));
+      const sponsorMeta = mvpSponsor
+        ? { sponsorId: mvpSponsor.id, sponsorName: mvpSponsor.name }
+        : undefined;
+      const mvpType: EffectType = match.sport === "VOLLEYBALL" ? "VOLLEY_MVP" : "MVP";
+
+      this.clearEffectQueue();
+      this.enqueueEffect("MVP_TEASE", { teamId: player.teamId, playerId, metadata: sponsorMeta });
+      if (mvpSponsor) {
+        this.enqueueEffect("MVP_SPONSOR", {
+          teamId: player.teamId,
+          playerId,
+          metadata: sponsorMeta,
+        });
       }
+      this.enqueueEffect(mvpType, {
+        teamId: player.teamId,
+        playerId,
+        metadata: sponsorMeta,
+      });
+      // Fallback if VOLLEY_MVP missing
+      if (mvpType === "VOLLEY_MVP" && !this.db.getEffectByType("VOLLEY_MVP")?.enabled) {
+        this.effectQueue = this.effectQueue.map((item) =>
+          item.type === "VOLLEY_MVP" ? { ...item, type: "MVP" as EffectType } : item
+        );
+      }
+      this.playNextQueuedEffect();
     }
     eventBus.emit("STATE_CHANGED", null);
   }
@@ -535,6 +589,7 @@ export class MatchEngine {
     if (match.mode !== "gameday") {
       throw new Error("Apresentação disponível só no Game Day");
     }
+    this.stopSponsorCarousel();
     this.arenaView = "scoreboard";
     this.triggerEffect("TEAM_INTRO");
     eventBus.emit("STATE_CHANGED", null);
@@ -549,19 +604,30 @@ export class MatchEngine {
     if (match.mode !== "gameday") {
       throw new Error("Countdown disponível só no Game Day");
     }
+    this.stopSponsorCarousel();
     this.startCountdown();
   }
 
   showScoreboard(): void {
     this.clearEffect(false);
+    this.clearEffectQueue();
+    this.stopSponsorCarousel();
     this.arenaView = "scoreboard";
     eventBus.emit("STATE_CHANGED", null);
   }
 
   clearScreen(): void {
     this.clearEffect(false);
+    this.clearEffectQueue();
     this.arenaView = "idle";
+    this.ensureIdleSponsorCarousel();
     eventBus.emit("STATE_CHANGED", null);
+  }
+
+  showSponsors(): void {
+    this.clearEffect(false);
+    this.clearEffectQueue();
+    this.startSponsorCarousel("manual");
   }
 
   triggerEffect(
@@ -578,7 +644,7 @@ export class MatchEngine {
     const payload: EffectPayload = {
       effectId: effect.id,
       type: effect.type,
-      duration: effect.duration,
+      duration: extras.duration ?? effect.duration,
       sound: effect.sound,
       text: effect.text,
       primaryColor: colors.primary,
@@ -593,13 +659,24 @@ export class MatchEngine {
     };
 
     this.activeEffect = payload;
-    this.arenaView = "scoreboard";
+    if (this.arenaView !== "sponsor_carousel") {
+      this.arenaView = "scoreboard";
+    }
     if (this.effectTimer) clearTimeout(this.effectTimer);
+    const duration = payload.duration;
     this.effectTimer = setTimeout(() => {
       this.activeEffect = null;
-      eventBus.emit("STATE_CHANGED", null);
       eventBus.emit("EFFECT_CANCEL", null);
-    }, effect.duration);
+      const pending = this.pendingAfterEffect;
+      this.pendingAfterEffect = null;
+      if (pending) {
+        pending();
+      } else if (this.effectQueue.length) {
+        this.playNextQueuedEffect();
+      } else {
+        eventBus.emit("STATE_CHANGED", null);
+      }
+    }, duration);
 
     eventBus.emit("EFFECT_TRIGGER", payload);
     return payload;
@@ -609,9 +686,186 @@ export class MatchEngine {
     if (this.effectTimer) clearTimeout(this.effectTimer);
     this.effectTimer = null;
     this.activeEffect = null;
+    this.pendingAfterEffect = null;
     if (emitCancel) {
       eventBus.emit("EFFECT_CANCEL", null);
     }
+  }
+
+  private clearEffectQueue(): void {
+    this.effectQueue = [];
+  }
+
+  private enqueueEffect(type: EffectType, extras: Partial<EffectPayload> = {}): void {
+    this.effectQueue.push({ type, extras });
+  }
+
+  private playNextQueuedEffect(): void {
+    const next = this.effectQueue.shift();
+    if (!next) {
+      eventBus.emit("STATE_CHANGED", null);
+      return;
+    }
+    const triggered = this.triggerEffect(next.type, next.extras);
+    if (!triggered) {
+      this.playNextQueuedEffect();
+    } else {
+      eventBus.emit("STATE_CHANGED", null);
+    }
+  }
+
+  /** Start weighted sponsor carousel for idle / halftime / manual. */
+  startSponsorCarousel(mode: SponsorCarouselMode): void {
+    const settings = this.db.getSettings();
+    const slots: SponsorSlot[] =
+      mode === "manual" ? ["manual", "idle"] : mode === "halftime" ? ["halftime"] : ["idle"];
+
+    let candidates = this.db.listSponsors().filter(
+      (s) => s.enabled && s.mediaUrl && s.slots.some((slot) => slots.includes(slot))
+    );
+    if (mode === "manual" && !candidates.length) {
+      candidates = sponsorsForSlot(this.db.listSponsors(), "idle");
+    } else if (mode === "halftime" && !candidates.length) {
+      // no sponsors — stay on scoreboard
+      this.stopSponsorCarousel();
+      this.arenaView = "scoreboard";
+      eventBus.emit("STATE_CHANGED", null);
+      return;
+    }
+
+    if (!candidates.length) {
+      this.stopSponsorCarousel();
+      if (mode === "idle") {
+        this.arenaView = "idle";
+      }
+      eventBus.emit("STATE_CHANGED", null);
+      return;
+    }
+
+    const returnView: "scoreboard" | "idle" =
+      mode === "idle"
+        ? "idle"
+        : this.arenaView === "sponsor_carousel"
+          ? (this.sponsorDisplay?.returnView ?? "scoreboard")
+          : this.arenaView === "idle"
+            ? "idle"
+            : "scoreboard";
+
+    const itemDurationMs =
+      mode === "halftime"
+        ? Math.max(3, settings.halftimeSponsorSeconds || 15) * 1000
+        : Math.max(5, settings.idleSponsorSeconds || 180) * 1000;
+
+    const playlist = buildWeightedPlaylist(candidates);
+    this.clearSponsorTimer();
+    this.sponsorDisplay = {
+      mode,
+      playlist,
+      index: 0,
+      itemStartedAt: Date.now(),
+      itemDurationMs,
+      returnView,
+      loop: mode === "idle",
+    };
+    this.arenaView = "sponsor_carousel";
+    this.scheduleSponsorAdvance();
+    eventBus.emit("STATE_CHANGED", null);
+  }
+
+  /** Public: refresh idle carousel after sponsor CRUD. */
+  refreshIdleSponsors(): void {
+    if (this.arenaView !== "idle" && !(this.arenaView === "sponsor_carousel" && this.sponsorDisplay?.mode === "idle")) {
+      return;
+    }
+    // Restart idle carousel with fresh playlist
+    if (this.sponsorDisplay?.mode === "idle") {
+      this.startSponsorCarousel("idle");
+      return;
+    }
+    this.ensureIdleSponsorCarousel();
+  }
+
+  private ensureIdleSponsorCarousel(): void {
+    if (this.arenaView !== "idle" && this.arenaView !== "sponsor_carousel") return;
+    // Already on idle carousel, or another carousel is running (halftime/manual)
+    if (this.sponsorDisplay) return;
+    const hasIdle = sponsorsForSlot(this.db.listSponsors(), "idle").length > 0;
+    if (!hasIdle) {
+      this.arenaView = "idle";
+      this.sponsorDisplay = null;
+      return;
+    }
+    this.startSponsorCarousel("idle");
+  }
+
+  private stopSponsorCarousel(): void {
+    this.clearSponsorTimer();
+    this.sponsorDisplay = null;
+  }
+
+  private clearSponsorTimer(): void {
+    if (this.sponsorTimer) {
+      clearTimeout(this.sponsorTimer);
+      this.sponsorTimer = null;
+    }
+  }
+
+  private scheduleSponsorAdvance(): void {
+    this.clearSponsorTimer();
+    const display = this.sponsorDisplay;
+    if (!display) return;
+    this.sponsorTimer = setTimeout(() => {
+      this.sponsorTimer = null;
+      this.advanceSponsorCarousel();
+    }, display.itemDurationMs);
+  }
+
+  private advanceSponsorCarousel(): void {
+    const display = this.sponsorDisplay;
+    if (!display) return;
+
+    const nextIndex = display.index + 1;
+    if (nextIndex >= display.playlist.length) {
+      if (display.loop) {
+        const slots: SponsorSlot[] = ["idle"];
+        const candidates = this.db
+          .listSponsors()
+          .filter((s) => s.enabled && s.mediaUrl && s.slots.some((slot) => slots.includes(slot)));
+        if (!candidates.length) {
+          this.stopSponsorCarousel();
+          this.arenaView = "idle";
+          eventBus.emit("STATE_CHANGED", null);
+          return;
+        }
+        this.sponsorDisplay = {
+          ...display,
+          playlist: buildWeightedPlaylist(candidates),
+          index: 0,
+          itemStartedAt: Date.now(),
+        };
+        this.scheduleSponsorAdvance();
+        eventBus.emit("STATE_CHANGED", null);
+        return;
+      }
+
+      // One-shot (halftime / manual) — restore previous view
+      const returnView = display.returnView;
+      this.stopSponsorCarousel();
+      this.arenaView = returnView;
+      if (returnView === "idle") {
+        this.ensureIdleSponsorCarousel();
+      }
+      eventBus.emit("STATE_CHANGED", null);
+      return;
+    }
+
+    this.sponsorDisplay = {
+      ...display,
+      index: nextIndex,
+      itemStartedAt: Date.now(),
+    };
+    this.scheduleSponsorAdvance();
+    eventBus.emit("STATE_CHANGED", null);
   }
 
   private resolvePrimaryTeam(match: Match | null, effect: Effect): Team | null {
@@ -973,12 +1227,19 @@ export class MatchEngine {
       }
     }, timeoutSeconds * 1000);
 
+    const timeoutSponsor = pickWeightedSponsor(sponsorsForSlot(this.db.listSponsors(), "timeout"));
+    this.timeoutSponsorId = timeoutSponsor?.id ?? null;
+
     if (match.mode === "gameday") {
       this.triggerEffect("VOLLEY_TIMEOUT", {
         teamId,
         homeScore: scoresFromVolleyballState(next).homeScore,
         awayScore: scoresFromVolleyballState(next).awayScore,
-        metadata: { timeoutSeconds, timeoutEndsAt },
+        metadata: {
+          timeoutSeconds,
+          timeoutEndsAt,
+          sponsorId: this.timeoutSponsorId,
+        },
       });
     }
     eventBus.emit("STATE_CHANGED", null);
@@ -989,6 +1250,7 @@ export class MatchEngine {
     if (sportState.status !== "TIMEOUT") throw new Error("Nenhum timeout ativo");
 
     this.clearTimeoutTimer();
+    this.timeoutSponsorId = null;
 
     const resumedStatus =
       sportState.specialState === "MATCH_POINT"

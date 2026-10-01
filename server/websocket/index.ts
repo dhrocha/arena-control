@@ -3,7 +3,7 @@ import { WebSocketServer } from "ws";
 import type { Server } from "node:http";
 import type { ClientCommand, ServerMessage } from "../../shared/events/index.ts";
 import { isClientCommand } from "../../shared/events/index.ts";
-import type { ClientRole } from "../../shared/types/index.ts";
+import type { ClientRole, EffectPayload } from "../../shared/types/index.ts";
 import { eventBus } from "../domain/EventBus.ts";
 import type { MatchEngine } from "../domain/MatchEngine.ts";
 
@@ -39,7 +39,7 @@ export function setupWebSocket(server: Server, engine: MatchEngine): WebSocketSe
   };
 
   eventBus.on("STATE_CHANGED", () => syncAll());
-  eventBus.on("EFFECT_TRIGGER", (payload) => {
+  eventBus.on<EffectPayload>("EFFECT_TRIGGER", (payload) => {
     broadcast({ type: "EFFECT_TRIGGER", payload, ts: Date.now() });
     syncAll();
   });
@@ -224,6 +224,9 @@ function handleCommand(
       case "SHOW_SCOREBOARD":
         engine.showScoreboard();
         break;
+      case "SHOW_SPONSORS":
+        engine.showSponsors();
+        break;
       case "SHOW_TEAM_INTRO":
         engine.showTeamIntro();
         break;
@@ -286,6 +289,7 @@ function isMatchCommand(type: string): boolean {
     "CANCEL_EFFECT",
     "TIMER_RESET",
     "SHOW_SCOREBOARD",
+    "SHOW_SPONSORS",
     "SHOW_TEAM_INTRO",
     "SHOW_COUNTDOWN",
     "REGISTER_POINT",

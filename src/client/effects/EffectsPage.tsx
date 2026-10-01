@@ -18,7 +18,9 @@ const EVENT_OPTIONS: Array<{ value: EventFilter; label: string }> = [
   { value: "VOLLEY_TIMEOUT", label: "Timeout" },
   { value: "MATCH_START", label: "Início" },
   { value: "MATCH_END", label: "Final" },
-  { value: "MVP", label: "MVP" },
+  { value: "MVP", label: "Craque da Partida" },
+  { value: "MVP_TEASE", label: "Craque (teaser)" },
+  { value: "MVP_SPONSOR", label: "Craque (patrocínio)" },
   { value: "COUNTDOWN", label: "Countdown" },
 ];
 

@@ -10,10 +10,14 @@ import type {
   MatchSportState,
   Player,
   Settings,
+  Sponsor,
+  SponsorMediaType,
+  SponsorTier,
   Sport,
   Team,
 } from "../../shared/types/index.ts";
 import { resolveEffectSport, resolveSport } from "../../shared/types/index.ts";
+import { normalizeSponsorSlots } from "../../shared/sponsors/playlist.ts";
 import { parseSportState, serializeSportState } from "../../shared/sports/index.ts";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -33,7 +37,9 @@ const DEFAULT_EFFECTS: Omit<Effect, "id">[] = [
   { name: "Countdown", type: "COUNTDOWN", duration: 11000, animation: "countdown", sound: "/audio/countdown.mp3", primaryColor: "#0a0e14", secondaryColor: "#f5c518", text: null, useTeamColors: false, enabled: true, sport: "ALL" },
   { name: "Intervalo", type: "HALF_TIME", duration: 5000, animation: "half-time", sound: "/audio/halftime.mp3", primaryColor: "#0a0e14", secondaryColor: "#f5c518", text: "HALF TIME", useTeamColors: false, enabled: true, sport: "FOOTBALL" },
   { name: "Fim", type: "MATCH_END", duration: 8000, animation: "match-end", sound: "/audio/match-end.mp3", primaryColor: "#0a0e14", secondaryColor: "#f5c518", text: "FINAL", useTeamColors: false, enabled: true, sport: "FOOTBALL" },
-  { name: "MVP", type: "MVP", duration: 7000, animation: "mvp", sound: "/audio/mvp.mp3", primaryColor: null, secondaryColor: null, text: "MVP", useTeamColors: true, enabled: true, sport: "ALL" },
+  { name: "MVP", type: "MVP", duration: 7000, animation: "mvp", sound: "/audio/mvp.mp3", primaryColor: null, secondaryColor: null, text: "CRAQUE DA PARTIDA", useTeamColors: true, enabled: true, sport: "ALL" },
+  { name: "Craque Tease", type: "MVP_TEASE", duration: 3500, animation: "mvp-tease", sound: "/audio/mvp.mp3", primaryColor: "#0a0e14", secondaryColor: "#f5c518", text: "O CRAQUE DA PARTIDA", useTeamColors: false, enabled: true, sport: "ALL" },
+  { name: "Craque Patrocínio", type: "MVP_SPONSOR", duration: 4000, animation: "mvp-sponsor", sound: null, primaryColor: "#0a0e14", secondaryColor: "#ffffff", text: "APRESENTADO POR", useTeamColors: false, enabled: true, sport: "ALL" },
   { name: "Apresentação", type: "TEAM_INTRO", duration: 8000, animation: "team-intro", sound: "/audio/match-start.mp3", primaryColor: null, secondaryColor: null, text: "VS", useTeamColors: true, enabled: true, sport: "ALL" },
   { name: "Pênalti", type: "PENALTY", duration: 4000, animation: "penalty", sound: "/audio/penalty.mp3", primaryColor: "#0a0e14", secondaryColor: "#ff3b30", text: "PÊNALTI", useTeamColors: false, enabled: true, sport: "FOOTBALL" },
   { name: "Cartão", type: "CARD", duration: 3500, animation: "card", sound: "/audio/card.mp3", primaryColor: "#0a0e14", secondaryColor: "#f5c518", text: "CARTÃO", useTeamColors: false, enabled: true, sport: "FOOTBALL" },
@@ -45,7 +51,7 @@ const DEFAULT_EFFECTS: Omit<Effect, "id">[] = [
   { name: "Match Point", type: "VOLLEY_MATCH_POINT", duration: 2800, animation: "volley-match-point", sound: "/audio/volleyball-match-point.mp3", primaryColor: "#0a0e14", secondaryColor: "#ff3b30", text: "MATCH POINT", useTeamColors: true, enabled: true, sport: "VOLLEYBALL" },
   { name: "Timeout", type: "VOLLEY_TIMEOUT", duration: 2500, animation: "volley-timeout", sound: "/audio/volleyball-timeout.mp3", primaryColor: "#0a0e14", secondaryColor: "#f5c518", text: "TIMEOUT", useTeamColors: true, enabled: true, sport: "VOLLEYBALL" },
   { name: "Fim da Partida", type: "VOLLEY_MATCH_END", duration: 8000, animation: "volley-match-end", sound: "/audio/volleyball-match-win.mp3", primaryColor: null, secondaryColor: null, text: "MATCH WON", useTeamColors: true, enabled: true, sport: "VOLLEYBALL" },
-  { name: "MVP Vôlei", type: "VOLLEY_MVP", duration: 7000, animation: "volley-mvp", sound: "/audio/volleyball-mvp.mp3", primaryColor: null, secondaryColor: null, text: "MVP", useTeamColors: true, enabled: true, sport: "VOLLEYBALL" },
+  { name: "MVP Vôlei", type: "VOLLEY_MVP", duration: 7000, animation: "volley-mvp", sound: "/audio/volleyball-mvp.mp3", primaryColor: null, secondaryColor: null, text: "CRAQUE DA PARTIDA", useTeamColors: true, enabled: true, sport: "VOLLEYBALL" },
   { name: "Início Vôlei", type: "VOLLEY_MATCH_START", duration: 4000, animation: "volley-match-start", sound: "/audio/volleyball-match-start.mp3", primaryColor: "#0a0e14", secondaryColor: "#e8f0ff", text: "GAME DAY", useTeamColors: false, enabled: true, sport: "VOLLEYBALL" },
   { name: "Início de Set", type: "VOLLEY_SET_START", duration: 3000, animation: "volley-set-start", sound: "/audio/volleyball-set-start.mp3", primaryColor: "#0a0e14", secondaryColor: "#f5c518", text: "SET START", useTeamColors: false, enabled: true, sport: "VOLLEYBALL" },
 ];
@@ -63,6 +69,8 @@ const DEFAULT_SETTINGS: Settings = {
   theme: "dark",
   port: 3000,
   countdownSeconds: 10,
+  idleSponsorSeconds: 180,
+  halftimeSponsorSeconds: 15,
 };
 
 export class ArenaDatabase {
@@ -157,6 +165,18 @@ export class ArenaDatabase {
         use_team_colors INTEGER NOT NULL DEFAULT 0,
         enabled INTEGER NOT NULL DEFAULT 1,
         sport TEXT NOT NULL DEFAULT 'ALL'
+      );
+
+      CREATE TABLE IF NOT EXISTS sponsors (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        media_url TEXT,
+        media_type TEXT NOT NULL DEFAULT 'image',
+        tier TEXT NOT NULL DEFAULT 'standard',
+        slots TEXT NOT NULL,
+        enabled INTEGER NOT NULL DEFAULT 1,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
       );
     `);
 
@@ -324,6 +344,72 @@ export class ArenaDatabase {
     return result.changes > 0;
   }
 
+  listSponsors(): Sponsor[] {
+    const rows = this.db
+      .prepare("SELECT * FROM sponsors ORDER BY name COLLATE NOCASE")
+      .all() as Array<Record<string, unknown>>;
+    return rows.map(mapSponsor);
+  }
+
+  getSponsor(id: string): Sponsor | null {
+    const row = this.db.prepare("SELECT * FROM sponsors WHERE id = ?").get(id) as
+      | Record<string, unknown>
+      | undefined;
+    return row ? mapSponsor(row) : null;
+  }
+
+  createSponsor(
+    input: Omit<Sponsor, "id" | "createdAt" | "updatedAt">
+  ): Sponsor {
+    const now = Date.now();
+    const sponsor: Sponsor = {
+      ...input,
+      slots: normalizeSponsorSlots(input.slots),
+      id: uuid(),
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.db
+      .prepare(
+        `INSERT INTO sponsors (id, name, media_url, media_type, tier, slots, enabled, created_at, updated_at)
+         VALUES (@id, @name, @mediaUrl, @mediaType, @tier, @slots, @enabled, @createdAt, @updatedAt)`
+      )
+      .run({
+        ...sponsor,
+        slots: JSON.stringify(sponsor.slots),
+        enabled: sponsor.enabled ? 1 : 0,
+      });
+    return sponsor;
+  }
+
+  updateSponsor(id: string, patch: Partial<Omit<Sponsor, "id" | "createdAt">>): Sponsor | null {
+    const existing = this.getSponsor(id);
+    if (!existing) return null;
+    const updated: Sponsor = {
+      ...existing,
+      ...patch,
+      slots: normalizeSponsorSlots(patch.slots ?? existing.slots),
+      id,
+      updatedAt: Date.now(),
+    };
+    this.db
+      .prepare(
+        `UPDATE sponsors SET name=@name, media_url=@mediaUrl, media_type=@mediaType, tier=@tier,
+         slots=@slots, enabled=@enabled, updated_at=@updatedAt WHERE id=@id`
+      )
+      .run({
+        ...updated,
+        slots: JSON.stringify(updated.slots),
+        enabled: updated.enabled ? 1 : 0,
+      });
+    return updated;
+  }
+
+  deleteSponsor(id: string): boolean {
+    const result = this.db.prepare("DELETE FROM sponsors WHERE id = ?").run(id);
+    return result.changes > 0;
+  }
+
   listMatches(): Match[] {
     const rows = this.db
       .prepare("SELECT * FROM matches ORDER BY created_at DESC")
@@ -467,11 +553,12 @@ export class ArenaDatabase {
 
   exportBackup(): Record<string, unknown> {
     return {
-      version: 4,
+      version: 5,
       exportedAt: Date.now(),
       settings: this.getSettings(),
       teams: this.listTeams(),
       players: this.listPlayers(),
+      sponsors: this.listSponsors(),
       matches: this.listMatches(),
       events: this.listMatches().flatMap((m) => this.listEvents(m.id)),
       effects: this.listEffects(),
@@ -482,6 +569,7 @@ export class ArenaDatabase {
     settings?: Settings;
     teams?: Team[];
     players?: Player[];
+    sponsors?: Sponsor[];
     /** Legacy backups may omit `sport` / `sportState`. */
     matches?: Array<
       Omit<Match, "sport" | "sportState"> & {
@@ -493,7 +581,9 @@ export class ArenaDatabase {
     effects?: Effect[];
   }): void {
     const tx = this.db.transaction(() => {
-      this.db.exec("DELETE FROM match_events; DELETE FROM matches; DELETE FROM players; DELETE FROM teams; DELETE FROM effects; DELETE FROM settings;");
+      this.db.exec(
+        "DELETE FROM match_events; DELETE FROM matches; DELETE FROM players; DELETE FROM teams; DELETE FROM sponsors; DELETE FROM effects; DELETE FROM settings;"
+      );
       if (data.settings) this.saveSettings({ ...DEFAULT_SETTINGS, ...data.settings });
       else this.saveSettings(DEFAULT_SETTINGS);
 
@@ -512,6 +602,18 @@ export class ArenaDatabase {
              VALUES (@id, @teamId, @name, @nickname, @shirtNumber, @photo, @active, @createdAt, @updatedAt)`
           )
           .run({ ...player, active: player.active ? 1 : 0 });
+      }
+      for (const sponsor of data.sponsors ?? []) {
+        this.db
+          .prepare(
+            `INSERT INTO sponsors (id, name, media_url, media_type, tier, slots, enabled, created_at, updated_at)
+             VALUES (@id, @name, @mediaUrl, @mediaType, @tier, @slots, @enabled, @createdAt, @updatedAt)`
+          )
+          .run({
+            ...sponsor,
+            slots: JSON.stringify(normalizeSponsorSlots(sponsor.slots)),
+            enabled: sponsor.enabled ? 1 : 0,
+          });
       }
       for (const raw of data.matches ?? []) {
         const sport = resolveSport(raw.sport);
@@ -591,6 +693,28 @@ function mapPlayer(row: Record<string, unknown>): Player {
     shirtNumber: Number(row.shirt_number),
     photo: (row.photo as string | null) ?? null,
     active: Boolean(row.active),
+    createdAt: Number(row.created_at),
+    updatedAt: Number(row.updated_at),
+  };
+}
+
+function mapSponsor(row: Record<string, unknown>): Sponsor {
+  let slotsRaw: unknown = [];
+  try {
+    slotsRaw = row.slots ? JSON.parse(String(row.slots)) : [];
+  } catch {
+    slotsRaw = [];
+  }
+  const tier = row.tier === "master" ? "master" : "standard";
+  const mediaType: SponsorMediaType = row.media_type === "video" ? "video" : "image";
+  return {
+    id: String(row.id),
+    name: String(row.name),
+    mediaUrl: (row.media_url as string | null) ?? null,
+    mediaType,
+    tier: tier as SponsorTier,
+    slots: normalizeSponsorSlots(slotsRaw),
+    enabled: Boolean(row.enabled),
     createdAt: Number(row.created_at),
     updatedAt: Number(row.updated_at),
   };

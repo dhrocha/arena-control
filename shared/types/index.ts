@@ -61,6 +61,8 @@ export type EffectType =
   | "HALF_TIME"
   | "MATCH_END"
   | "MVP"
+  | "MVP_TEASE"
+  | "MVP_SPONSOR"
   | "TEAM_INTRO"
   | "PLAYER_INTRO"
   | "PENALTY"
@@ -76,6 +78,37 @@ export type EffectType =
   | "VOLLEY_MVP"
   | "VOLLEY_MATCH_START"
   | "VOLLEY_SET_START";
+
+export type SponsorTier = "master" | "standard";
+
+export type SponsorSlot = "idle" | "timeout" | "halftime" | "mvp" | "manual";
+
+export type SponsorMediaType = "image" | "video";
+
+export interface Sponsor {
+  id: string;
+  name: string;
+  mediaUrl: string | null;
+  mediaType: SponsorMediaType;
+  tier: SponsorTier;
+  slots: SponsorSlot[];
+  enabled: boolean;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export type SponsorCarouselMode = "idle" | "halftime" | "manual";
+
+export interface SponsorDisplayState {
+  mode: SponsorCarouselMode;
+  playlist: string[];
+  index: number;
+  itemStartedAt: number;
+  itemDurationMs: number;
+  returnView: "scoreboard" | "idle";
+  /** When true, playlist loops forever (idle). */
+  loop: boolean;
+}
 
 export interface Team {
   id: string;
@@ -170,6 +203,10 @@ export interface Settings {
   theme: string;
   port: number;
   countdownSeconds: number;
+  /** Seconds each sponsor stays on idle / manual carousel. */
+  idleSponsorSeconds: number;
+  /** Seconds each sponsor stays on halftime carousel. */
+  halftimeSponsorSeconds: number;
 }
 
 export interface ClientInfo {
@@ -192,12 +229,13 @@ export interface NetworkInfo {
 }
 
 /** O que a Arena deve mostrar quando não há efeito ativo */
-export type ArenaView = "scoreboard" | "idle";
+export type ArenaView = "scoreboard" | "idle" | "sponsor_carousel";
 
 export interface AppState {
   settings: Settings;
   teams: Team[];
   players: Player[];
+  sponsors: Sponsor[];
   match: Match | null;
   events: MatchEvent[];
   effects: Effect[];
@@ -207,6 +245,9 @@ export interface AppState {
   network: NetworkInfo;
   activeEffect: EffectPayload | null;
   arenaView: ArenaView;
+  sponsorDisplay: SponsorDisplayState | null;
+  /** Sponsor chosen for the active volleyball timeout split. */
+  timeoutSponsorId: string | null;
 }
 
 export interface EffectPayload {

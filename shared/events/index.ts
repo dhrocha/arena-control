@@ -43,6 +43,7 @@ export type ClientCommand =
   | { type: "CANCEL_EFFECT"; payload?: Record<string, never> }
   | { type: "TIMER_RESET"; payload?: Record<string, never> }
   | { type: "SHOW_SCOREBOARD"; payload?: Record<string, never> }
+  | { type: "SHOW_SPONSORS"; payload?: Record<string, never> }
   | { type: "SHOW_TEAM_INTRO"; payload?: Record<string, never> }
   | { type: "SHOW_COUNTDOWN"; payload?: Record<string, never> }
   | {

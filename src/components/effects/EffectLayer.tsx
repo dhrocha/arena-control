@@ -1,5 +1,7 @@
 import { AnimatePresence, motion } from "framer-motion";
-import type { AppState, EffectPayload, EffectType, Player, Team } from "@shared/types/index";
+import type { AppState, EffectPayload, EffectType, Player, Sponsor, Team } from "@shared/types/index";
+import { SponsorMedia } from "../sponsors/SponsorMedia";
+import "../sponsors/sponsors-display.css";
 import "./effects.css";
 
 interface Props {
@@ -53,7 +55,26 @@ export function EffectLayer({ effect, state }: Props) {
           />
         )}
         {(effect.type === "MVP" || effect.type === "VOLLEY_MVP") && (
-          <MvpEffect team={team} player={player} />
+          <MvpEffect
+            team={team}
+            player={player}
+            sponsor={
+              typeof effect.metadata?.sponsorId === "string"
+                ? state.sponsors.find((s) => s.id === effect.metadata?.sponsorId)
+                : undefined
+            }
+          />
+        )}
+        {effect.type === "MVP_TEASE" && <MvpTeaseEffect text={effect.text ?? "O CRAQUE DA PARTIDA"} />}
+        {effect.type === "MVP_SPONSOR" && (
+          <MvpSponsorEffect
+            text={effect.text ?? "APRESENTADO POR"}
+            sponsor={
+              typeof effect.metadata?.sponsorId === "string"
+                ? state.sponsors.find((s) => s.id === effect.metadata?.sponsorId)
+                : undefined
+            }
+          />
         )}
         {(effect.type === "PENALTY" || effect.type === "CARD" || effect.type === "CUSTOM") && (
           <BannerEffect text={effect.text ?? effect.type} accent={effect.secondaryColor} />
@@ -560,7 +581,15 @@ function MatchEndEffect({
   );
 }
 
-function MvpEffect({ team, player }: { team?: Team | null; player?: Player | null }) {
+function MvpEffect({
+  team,
+  player,
+  sponsor,
+}: {
+  team?: Team | null;
+  player?: Player | null;
+  sponsor?: Sponsor | null;
+}) {
   return (
     <div
       className="fx-mvp"
@@ -568,12 +597,43 @@ function MvpEffect({ team, player }: { team?: Team | null; player?: Player | nul
         background: `linear-gradient(160deg, ${team?.primaryColor ?? "#111"}, #05070b)`,
       }}
     >
-      <div className="fx-mvp-badge">MVP</div>
+      <div className="fx-mvp-badge craque">CRAQUE DA PARTIDA</div>
       <div className="fx-mvp-photo">
         {player?.photo ? <img src={player.photo} alt="" /> : <span>{player?.shirtNumber ?? "?"}</span>}
       </div>
       <h1>{player?.nickname || player?.name}</h1>
       <h2 style={{ color: team?.secondaryColor }}>{team?.name}</h2>
+      {sponsor?.mediaUrl && (
+        <div className="fx-mvp-footer">
+          <span>Apresentado por</span>
+          <SponsorMedia sponsor={sponsor} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MvpTeaseEffect({ text }: { text: string }) {
+  return (
+    <motion.div
+      className="fx-mvp-tease"
+      initial={{ scale: 0.85, opacity: 0 }}
+      animate={{ scale: 1, opacity: 1 }}
+      transition={{ duration: 0.45, ease: "easeOut" }}
+    >
+      <h1>{text}</h1>
+    </motion.div>
+  );
+}
+
+function MvpSponsorEffect({ text, sponsor }: { text: string; sponsor?: Sponsor | null }) {
+  return (
+    <div className="fx-mvp-sponsor">
+      <div className="label">{text}</div>
+      <div className="logo-wrap">
+        <SponsorMedia sponsor={sponsor} />
+      </div>
+      {sponsor?.name && <div className="label" style={{ opacity: 0.7, letterSpacing: "0.08em" }}>{sponsor.name}</div>}
     </div>
   );
 }

@@ -124,6 +124,7 @@ export function AdminPage() {
             Histórico
           </button>
           <Link to="/effects">Efeitos</Link>
+          <Link to="/sponsors">Patrocinadores</Link>
           <Link to="/settings">Configurações</Link>
           <Link to="/setup">Setup</Link>
           <Link to="/arena" target="_blank">
@@ -407,14 +408,14 @@ export function AdminPage() {
                       },
                       {
                         key: "mvp",
-                        label: "MVP",
+                        label: "CRAQUE",
                         disabled: !match || !isGameDay,
                         onClick: () => {
                           const first = state?.players.find(
                             (p) => p.teamId === match?.homeTeamId || p.teamId === match?.awayTeamId
                           );
                           if (first) safeSend({ type: "SELECT_MVP", payload: { playerId: first.id } });
-                          else setFlash("Cadastre jogadores para escolher MVP");
+                          else setFlash("Cadastre jogadores para escolher o Craque");
                         },
                       },
                       {
@@ -428,6 +429,12 @@ export function AdminPage() {
                         label: "PLACAR",
                         disabled: !match,
                         onClick: () => safeSend({ type: "SHOW_SCOREBOARD" }),
+                      },
+                      {
+                        key: "sponsors",
+                        label: "PATROCÍNIOS",
+                        disabled: false,
+                        onClick: () => safeSend({ type: "SHOW_SPONSORS" }),
                       },
                       {
                         key: "clear",
