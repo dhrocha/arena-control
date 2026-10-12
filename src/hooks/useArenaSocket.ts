@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { v4 as uuidv4 } from "uuid";
 import type { ClientCommand, ServerMessage } from "@shared/events/index";
 import type { AppState, ClientRole, EffectPayload } from "@shared/types/index";
 
@@ -6,7 +7,7 @@ function makeClientId(role: ClientRole): string {
   const key = `arena-client-id-${role}`;
   const existing = sessionStorage.getItem(key);
   if (existing) return existing;
-  const id = `${role}-${crypto.randomUUID()}`;
+  const id = `${role}-${uuidv4()}`;
   sessionStorage.setItem(key, id);
   return id;
 }

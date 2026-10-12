@@ -57,14 +57,15 @@ export function ControlPage() {
   const [actionError, setActionError] = useState<string | null>(null);
 
   const match = state?.match ?? null;
-  const clock = useMatchClock(match);
+  const clock = useMatchClock(match, state?.serverTime);
   const home = match ? state?.teams.find((t) => t.id === match.homeTeamId) : null;
   const away = match ? state?.teams.find((t) => t.id === match.awayTeamId) : null;
   const isGameDay = match?.mode === "gameday";
   const isVolleyball = match?.sport === "VOLLEYBALL";
   const volley = match?.sportState?.sport === "VOLLEYBALL" ? match.sportState : null;
   const timeoutLeft = useCountdownEndsAt(
-    volley?.status === "TIMEOUT" ? volley.timeoutEndsAt : null
+    volley?.status === "TIMEOUT" ? volley.timeoutEndsAt : null,
+    state?.serverTime
   );
 
   const unlockAudio = () => audioManager.unlock();

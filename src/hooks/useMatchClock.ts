@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
 import type { Match } from "@shared/types/index";
+import { useServerNow } from "./useServerNow";
 
 export function getMatchElapsedMs(match: Match | null, now: number): number {
   if (!match) return 0;
@@ -16,14 +16,7 @@ export function formatMatchTime(ms: number): string {
   return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 }
 
-export function useMatchClock(match: Match | null): string {
-  const [now, setNow] = useState(Date.now());
-
-  useEffect(() => {
-    if (!match || match.status !== "playing") return;
-    const id = setInterval(() => setNow(Date.now()), 200);
-    return () => clearInterval(id);
-  }, [match?.status, match?.startedAt, match?.id]);
-
+export function useMatchClock(match: Match | null, serverTime?: number): string {
+  const now = useServerNow(serverTime, match?.status === "playing");
   return formatMatchTime(getMatchElapsedMs(match, now));
 }

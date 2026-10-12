@@ -8,13 +8,15 @@ interface Props {
   home?: Team | null;
   away?: Team | null;
   match: Match;
+  serverTime?: number;
   compact?: boolean;
 }
 
-export function VolleyballScoreboard({ home, away, match, compact }: Props) {
+export function VolleyballScoreboard({ home, away, match, serverTime, compact }: Props) {
   const volley = match.sportState?.sport === "VOLLEYBALL" ? match.sportState : null;
   const timeoutLeft = useCountdownEndsAt(
-    volley?.status === "TIMEOUT" ? volley.timeoutEndsAt : null
+    volley?.status === "TIMEOUT" ? volley.timeoutEndsAt : null,
+    serverTime
   );
 
   if (!volley) {

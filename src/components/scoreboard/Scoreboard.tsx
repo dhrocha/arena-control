@@ -7,11 +7,12 @@ interface Props {
   home?: Team | null;
   away?: Team | null;
   match: Match;
+  serverTime?: number;
   compact?: boolean;
 }
 
-export function Scoreboard({ home, away, match, compact }: Props) {
-  const clock = useMatchClock(match);
+export function Scoreboard({ home, away, match, serverTime, compact }: Props) {
+  const clock = useMatchClock(match, serverTime);
   const [minutes, seconds] = clock.split(":");
 
   return (

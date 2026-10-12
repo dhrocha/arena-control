@@ -23,7 +23,7 @@ export function AdminPage() {
     label: "Central de Comando",
   });
   const match = state?.match ?? null;
-  const clock = useMatchClock(match);
+  const clock = useMatchClock(match, state?.serverTime);
   const home = match ? state?.teams.find((t) => t.id === match.homeTeamId) : null;
   const away = match ? state?.teams.find((t) => t.id === match.awayTeamId) : null;
   const volley = match?.sportState?.sport === "VOLLEYBALL" ? match.sportState : null;
@@ -463,9 +463,9 @@ export function AdminPage() {
                     !lastEffect &&
                     (state?.arenaView ?? "scoreboard") !== "idle" &&
                     (match.sport === "VOLLEYBALL" ? (
-                      <VolleyballScoreboard home={home} away={away} match={match} compact />
+                      <VolleyballScoreboard home={home} away={away} match={match} serverTime={state?.serverTime} compact />
                     ) : (
-                      <Scoreboard home={home} away={away} match={match} compact />
+                      <Scoreboard home={home} away={away} match={match} serverTime={state?.serverTime} compact />
                     ))}
                   {(!match || (state?.arenaView === "idle" && !lastEffect)) && (
                     <div className="preview-empty">{match ? "TELA LIMPA" : "SEM PARTIDA"}</div>

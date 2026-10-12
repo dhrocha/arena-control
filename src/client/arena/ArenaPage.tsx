@@ -62,7 +62,10 @@ export function ArenaPage() {
   const away = match ? state?.teams.find((t) => t.id === match.awayTeamId) : null;
   const volley = match?.sport === "VOLLEYBALL" ? match.sportState : null;
   const isTimeout = volley?.status === "TIMEOUT";
-  const timeoutLeft = useCountdownEndsAt(isTimeout ? volley?.timeoutEndsAt : null);
+  const timeoutLeft = useCountdownEndsAt(
+    isTimeout ? volley?.timeoutEndsAt : null,
+    state?.serverTime
+  );
 
   const isMicroPoint = lastEffect?.type === "VOLLEY_POINT";
   const idleFx = !lastEffect || isMicroPoint;
@@ -173,9 +176,9 @@ export function ArenaPage() {
             )}
             {showScoreboard &&
               (match.sport === "VOLLEYBALL" ? (
-                <VolleyballScoreboard home={home} away={away} match={match} />
+                <VolleyballScoreboard home={home} away={away} match={match} serverTime={state?.serverTime} />
               ) : (
-                <Scoreboard home={home} away={away} match={match} />
+                <Scoreboard home={home} away={away} match={match} serverTime={state?.serverTime} />
               ))}
             {showIdle && (
               <div className="arena-idle">
