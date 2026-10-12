@@ -1,0 +1,132 @@
+.sponsors-root {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.sponsors-root header h1 {
+  margin: 0.25rem 0 0;
+  font-family: var(--font-display);
+}
+
+.sponsors-err {
+  color: var(--danger);
+}
+
+.sponsors-ok {
+  color: var(--ok);
+}
+
+.sponsors-slots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.sponsors-slot-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.65rem;
+  border: 1px solid var(--border, #333);
+  border-radius: 6px;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.sponsors-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.sponsors-list {
+  display: grid;
+  gap: 1rem;
+}
+
+.sponsors-card {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  gap: 1rem;
+  border: 1px solid var(--border, #333);
+  border-radius: 10px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.sponsors-card.off {
+  opacity: 0.55;
+}
+
+.sponsors-card-media {
+  min-height: 120px;
+  background: #111;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sponsors-card-media img,
+.sponsors-card-media video {
+  width: 100%;
+  height: 120px;
+  object-fit: cover;
+}
+
+.sponsors-card-placeholder {
+  color: var(--text-dim);
+  font-size: 0.85rem;
+  padding: 1rem;
+  text-align: center;
+}
+
+.sponsors-card-body {
+  padding: 0.75rem 0.75rem 0.75rem 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.sponsors-tier {
+  align-self: start;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+  background: #333;
+}
+
+.sponsors-tier.master {
+  background: #8b4513;
+  color: #ffd7a8;
+}
+
+.sponsors-card-slots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.sponsors-card-slots em {
+  font-style: normal;
+  font-size: 0.75rem;
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+@media (max-width: 640px) {
+  .sponsors-card {
+    grid-template-columns: 1fr;
+  }
+
+  .sponsors-card-body {
+    padding: 0 0.75rem 0.75rem;
+  }
+}
