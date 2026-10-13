@@ -148,10 +148,8 @@ export class VolleyballRules implements SportRules<VolleyballMatchState> {
 
     next.updatedAt = now;
 
-    // Optional: rotate serve to scoring team when autoServer is on
-    if (next.config.autoServer) {
-      next.serverTeamId = input.teamId;
-    }
+    // Rally scoring: scoring team always earns the next serve
+    next.serverTeamId = input.teamId;
 
     const limit = this.pointLimitForCurrentSet(next);
     const minDiff = next.config.minDifference;

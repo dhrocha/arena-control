@@ -92,6 +92,32 @@
   gap: 0.35rem;
 }
 
+.sponsors-vacancy {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.55rem;
+  margin-bottom: 0.5rem;
+}
+
+.sponsors-vacancy-chip {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.sponsors-vacancy-chip strong {
+  font-size: 0.85rem;
+}
+
+.sponsors-vacancy-chip span {
+  font-size: 0.75rem;
+  opacity: 0.75;
+}
+
 .sponsors-tier {
   align-self: start;
   font-size: 0.7rem;
@@ -102,9 +128,34 @@
   background: #333;
 }
 
-.sponsors-tier.master {
-  background: #8b4513;
+.sponsors-tier.master,
+.sponsors-vacancy-chip.master {
+  background: #5c3b12;
   color: #ffd7a8;
+}
+
+.sponsors-tier.oficial,
+.sponsors-vacancy-chip.oficial {
+  background: #1a3a5c;
+  color: #9fd0ff;
+}
+
+.sponsors-tier.parceiro,
+.sponsors-vacancy-chip.parceiro {
+  background: #1f3d2a;
+  color: #a8e6bf;
+}
+
+.sponsors-tier.amigo,
+.sponsors-vacancy-chip.amigo {
+  background: #333;
+  color: #ddd;
+}
+
+@media (max-width: 800px) {
+  .sponsors-vacancy {
+    grid-template-columns: 1fr 1fr;
+  }
 }
 
 .sponsors-card-slots {

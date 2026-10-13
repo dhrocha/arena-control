@@ -49,8 +49,8 @@ export function Scoreboard({ home, away, match, serverTime, compact }: Props) {
 
       {!compact && (
         <div className="sb-team-labels">
-          <span className="home">{home?.shortName ?? "HOME"}</span>
-          <span className="away">{away?.shortName ?? "AWAY"}</span>
+          <span className="home">{home?.shortName ?? "CASA"}</span>
+          <span className="away">{away?.shortName ?? "FORA"}</span>
         </div>
       )}
 
@@ -74,7 +74,7 @@ function Crest({ team, side }: { team?: Team | null; side: "home" | "away" }) {
 function periodLabel(match: Match): string {
   if (match.status === "halftime") return "INTERVALO";
   if (match.status === "finished") return "FINAL";
-  if (match.status === "countdown") return "COUNTDOWN";
+  if (match.status === "countdown") return "CONTAGEM";
   if (match.status === "setup") return "PRÉ-JOGO";
   if (match.currentPeriod === 2) return "2º TEMPO";
   return "1º TEMPO";

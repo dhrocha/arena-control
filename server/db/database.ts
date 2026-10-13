@@ -10,14 +10,21 @@ import type {
   MatchSportState,
   Player,
   Settings,
+  PeladaBooking,
+  PeladaBookingStatus,
   Sponsor,
   SponsorMediaType,
-  SponsorTier,
   Sport,
   Team,
 } from "../../shared/types/index.ts";
 import { resolveEffectSport, resolveSport } from "../../shared/types/index.ts";
-import { normalizeSponsorSlots } from "../../shared/sponsors/playlist.ts";
+import { getAdvertisePhone } from "../config/env.ts";
+import { generatePeladaPin } from "../../shared/pelada/pin.ts";
+import {
+  normalizeSponsorSlots,
+  normalizeSponsorTier,
+  normalizeSponsorTierSeconds,
+} from "../../shared/sponsors/playlist.ts";
 import { parseSportState, serializeSportState } from "../../shared/sports/index.ts";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -37,9 +44,9 @@ const DEFAULT_EFFECTS: Omit<Effect, "id">[] = [
   { name: "Countdown", type: "COUNTDOWN", duration: 11000, animation: "countdown", sound: "/audio/countdown.mp3", primaryColor: "#0a0e14", secondaryColor: "#f5c518", text: null, useTeamColors: false, enabled: true, sport: "ALL" },
   { name: "Intervalo", type: "HALF_TIME", duration: 5000, animation: "half-time", sound: "/audio/halftime.mp3", primaryColor: "#0a0e14", secondaryColor: "#f5c518", text: "HALF TIME", useTeamColors: false, enabled: true, sport: "FOOTBALL" },
   { name: "Fim", type: "MATCH_END", duration: 8000, animation: "match-end", sound: "/audio/match-end.mp3", primaryColor: "#0a0e14", secondaryColor: "#f5c518", text: "FINAL", useTeamColors: false, enabled: true, sport: "FOOTBALL" },
-  { name: "MVP", type: "MVP", duration: 7000, animation: "mvp", sound: "/audio/mvp.mp3", primaryColor: null, secondaryColor: null, text: "CRAQUE DA PARTIDA", useTeamColors: true, enabled: true, sport: "ALL" },
+  { name: "MVP", type: "MVP", duration: 10000, animation: "mvp", sound: "/audio/mvp.mp3", primaryColor: null, secondaryColor: null, text: "CRAQUE DA PARTIDA", useTeamColors: true, enabled: true, sport: "ALL" },
   { name: "Craque Tease", type: "MVP_TEASE", duration: 3500, animation: "mvp-tease", sound: "/audio/mvp.mp3", primaryColor: "#0a0e14", secondaryColor: "#f5c518", text: "O CRAQUE DA PARTIDA", useTeamColors: false, enabled: true, sport: "ALL" },
-  { name: "Craque Patrocínio", type: "MVP_SPONSOR", duration: 4000, animation: "mvp-sponsor", sound: null, primaryColor: "#0a0e14", secondaryColor: "#ffffff", text: "APRESENTADO POR", useTeamColors: false, enabled: true, sport: "ALL" },
+  { name: "Craque Patrocínio", type: "MVP_SPONSOR", duration: 5000, animation: "mvp-sponsor", sound: null, primaryColor: "#0a0e14", secondaryColor: "#ffffff", text: "APRESENTADO POR", useTeamColors: false, enabled: true, sport: "ALL" },
   { name: "Apresentação", type: "TEAM_INTRO", duration: 8000, animation: "team-intro", sound: "/audio/match-start.mp3", primaryColor: null, secondaryColor: null, text: "VS", useTeamColors: true, enabled: true, sport: "ALL" },
   { name: "Pênalti", type: "PENALTY", duration: 4000, animation: "penalty", sound: "/audio/penalty.mp3", primaryColor: "#0a0e14", secondaryColor: "#ff3b30", text: "PÊNALTI", useTeamColors: false, enabled: true, sport: "FOOTBALL" },
   { name: "Cartão", type: "CARD", duration: 3500, animation: "card", sound: "/audio/card.mp3", primaryColor: "#0a0e14", secondaryColor: "#f5c518", text: "CARTÃO", useTeamColors: false, enabled: true, sport: "FOOTBALL" },
@@ -51,7 +58,7 @@ const DEFAULT_EFFECTS: Omit<Effect, "id">[] = [
   { name: "Match Point", type: "VOLLEY_MATCH_POINT", duration: 2800, animation: "volley-match-point", sound: "/audio/volleyball-match-point.mp3", primaryColor: "#0a0e14", secondaryColor: "#ff3b30", text: "MATCH POINT", useTeamColors: true, enabled: true, sport: "VOLLEYBALL" },
   { name: "Timeout", type: "VOLLEY_TIMEOUT", duration: 2500, animation: "volley-timeout", sound: "/audio/volleyball-timeout.mp3", primaryColor: "#0a0e14", secondaryColor: "#f5c518", text: "TIMEOUT", useTeamColors: true, enabled: true, sport: "VOLLEYBALL" },
   { name: "Fim da Partida", type: "VOLLEY_MATCH_END", duration: 8000, animation: "volley-match-end", sound: "/audio/volleyball-match-win.mp3", primaryColor: null, secondaryColor: null, text: "MATCH WON", useTeamColors: true, enabled: true, sport: "VOLLEYBALL" },
-  { name: "MVP Vôlei", type: "VOLLEY_MVP", duration: 7000, animation: "volley-mvp", sound: "/audio/volleyball-mvp.mp3", primaryColor: null, secondaryColor: null, text: "CRAQUE DA PARTIDA", useTeamColors: true, enabled: true, sport: "VOLLEYBALL" },
+  { name: "MVP Vôlei", type: "VOLLEY_MVP", duration: 10000, animation: "volley-mvp", sound: "/audio/volleyball-mvp.mp3", primaryColor: null, secondaryColor: null, text: "CRAQUE DA PARTIDA", useTeamColors: true, enabled: true, sport: "VOLLEYBALL" },
   { name: "Início Vôlei", type: "VOLLEY_MATCH_START", duration: 4000, animation: "volley-match-start", sound: "/audio/volleyball-match-start.mp3", primaryColor: "#0a0e14", secondaryColor: "#e8f0ff", text: "GAME DAY", useTeamColors: false, enabled: true, sport: "VOLLEYBALL" },
   { name: "Início de Set", type: "VOLLEY_SET_START", duration: 3000, animation: "volley-set-start", sound: "/audio/volleyball-set-start.mp3", primaryColor: "#0a0e14", secondaryColor: "#f5c518", text: "SET START", useTeamColors: false, enabled: true, sport: "VOLLEYBALL" },
 ];
@@ -70,7 +77,14 @@ const DEFAULT_SETTINGS: Settings = {
   port: 3000,
   countdownSeconds: 10,
   idleSponsorSeconds: 180,
-  halftimeSponsorSeconds: 15,
+  halftimeSponsorSeconds: 30,
+  sponsorTierSeconds: {
+    master: 60,
+    oficial: 45,
+    parceiro: 30,
+    amigo: 20,
+  },
+  advertisePhone: "(11) 99999-9999",
 };
 
 export class ArenaDatabase {
@@ -178,11 +192,80 @@ export class ArenaDatabase {
         created_at INTEGER NOT NULL,
         updated_at INTEGER NOT NULL
       );
+
+      CREATE TABLE IF NOT EXISTS pelada_bookings (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        phone TEXT NOT NULL,
+        pin TEXT NOT NULL DEFAULT '',
+        scheduled_at INTEGER NOT NULL,
+        duration_minutes INTEGER NOT NULL,
+        sport TEXT NOT NULL,
+        status TEXT NOT NULL,
+        session_started_at INTEGER,
+        session_ends_at INTEGER,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      );
     `);
 
     this.ensureColumn("matches", "sport", "TEXT NOT NULL DEFAULT 'FOOTBALL'");
     this.ensureColumn("matches", "sport_state", "TEXT");
     this.ensureColumn("effects", "sport", "TEXT NOT NULL DEFAULT 'ALL'");
+    this.ensureColumn("pelada_bookings", "pin", "TEXT");
+    this.backfillPeladaPins();
+  }
+
+  /** Ensure every booking has a unique random PIN (legacy rows). */
+  private backfillPeladaPins(): void {
+    const rows = this.db
+      .prepare(
+        `SELECT id FROM pelada_bookings
+         WHERE pin IS NULL OR pin = '' OR TRIM(pin) = ''`
+      )
+      .all() as Array<{ id: string }>;
+    if (!rows.length) return;
+    const update = this.db.prepare(
+      "UPDATE pelada_bookings SET pin = ?, updated_at = ? WHERE id = ?"
+    );
+    const tx = this.db.transaction(() => {
+      for (const row of rows) {
+        update.run(this.allocatePeladaPin(), Date.now(), row.id);
+      }
+    });
+    tx();
+  }
+
+  /** Random PIN not used by another scheduled/active booking. */
+  allocatePeladaPin(exceptId?: string): string {
+    for (let attempt = 0; attempt < 40; attempt++) {
+      const pin = generatePeladaPin();
+      const clash = this.db
+        .prepare(
+          `SELECT id FROM pelada_bookings
+           WHERE pin = ? AND status IN ('scheduled', 'active')
+             AND (? IS NULL OR id != ?)
+           LIMIT 1`
+        )
+        .get(pin, exceptId ?? null, exceptId ?? null) as { id: string } | undefined;
+      if (!clash) return pin;
+    }
+    // Extremely unlikely fallback
+    return `${generatePeladaPin()}${Math.floor(Math.random() * 10)}`;
+  }
+
+  findOpenPeladaByPin(pin: string): PeladaBooking | null {
+    const normalized = String(pin ?? "").trim();
+    if (!normalized) return null;
+    const row = this.db
+      .prepare(
+        `SELECT * FROM pelada_bookings
+         WHERE pin = ? AND status IN ('scheduled', 'active')
+         ORDER BY CASE status WHEN 'active' THEN 0 ELSE 1 END, scheduled_at ASC
+         LIMIT 1`
+      )
+      .get(normalized) as Record<string, unknown> | undefined;
+    return row ? mapPeladaBooking(row) : null;
   }
 
   /** Additive, safe migration for existing DBs created before a column existed. */
@@ -241,7 +324,13 @@ export class ArenaDatabase {
   getSettings(): Settings {
     const rows = this.db.prepare("SELECT key, value FROM settings").all() as Array<{ key: string; value: string }>;
     const map = Object.fromEntries(rows.map((r) => [r.key, JSON.parse(r.value) as unknown]));
-    return { ...DEFAULT_SETTINGS, ...(map as Partial<Settings>) };
+    const merged = { ...DEFAULT_SETTINGS, ...(map as Partial<Settings>) };
+    merged.sponsorTierSeconds = normalizeSponsorTierSeconds(
+      (map as Partial<Settings>).sponsorTierSeconds ?? DEFAULT_SETTINGS.sponsorTierSeconds
+    );
+    // Always inject from env — never persist advertisePhone from clients
+    merged.advertisePhone = getAdvertisePhone();
+    return merged;
   }
 
   saveSettings(settings: Settings): void {
@@ -250,10 +339,108 @@ export class ArenaDatabase {
     );
     const tx = this.db.transaction(() => {
       for (const [key, value] of Object.entries(settings)) {
+        if (key === "advertisePhone") continue;
         upsert.run(key, JSON.stringify(value));
       }
     });
     tx();
+  }
+
+  listPeladaBookings(): PeladaBooking[] {
+    const rows = this.db
+      .prepare("SELECT * FROM pelada_bookings ORDER BY scheduled_at DESC")
+      .all() as Array<Record<string, unknown>>;
+    return rows.map(mapPeladaBooking);
+  }
+
+  getPeladaBooking(id: string): PeladaBooking | null {
+    const row = this.db.prepare("SELECT * FROM pelada_bookings WHERE id = ?").get(id) as
+      | Record<string, unknown>
+      | undefined;
+    return row ? mapPeladaBooking(row) : null;
+  }
+
+  getActivePeladaBooking(): PeladaBooking | null {
+    const row = this.db
+      .prepare("SELECT * FROM pelada_bookings WHERE status = 'active' ORDER BY session_started_at DESC LIMIT 1")
+      .get() as Record<string, unknown> | undefined;
+    return row ? mapPeladaBooking(row) : null;
+  }
+
+  createPeladaBooking(input: {
+    name: string;
+    phone: string;
+    scheduledAt: number;
+    durationMinutes: number;
+    sport: Sport;
+  }): PeladaBooking {
+    const now = Date.now();
+    const booking: PeladaBooking = {
+      id: uuid(),
+      name: input.name,
+      phone: input.phone,
+      pin: this.allocatePeladaPin(),
+      scheduledAt: input.scheduledAt,
+      durationMinutes: input.durationMinutes,
+      sport: resolveSport(input.sport),
+      status: "scheduled",
+      sessionStartedAt: null,
+      sessionEndsAt: null,
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.db
+      .prepare(
+        `INSERT INTO pelada_bookings
+         (id, name, phone, pin, scheduled_at, duration_minutes, sport, status,
+          session_started_at, session_ends_at, created_at, updated_at)
+         VALUES (@id, @name, @phone, @pin, @scheduledAt, @durationMinutes, @sport, @status,
+          @sessionStartedAt, @sessionEndsAt, @createdAt, @updatedAt)`
+      )
+      .run(booking);
+    return booking;
+  }
+
+  updatePeladaBooking(
+    id: string,
+    patch: Partial<
+      Pick<
+        PeladaBooking,
+        | "name"
+        | "phone"
+        | "scheduledAt"
+        | "durationMinutes"
+        | "sport"
+        | "status"
+        | "sessionStartedAt"
+        | "sessionEndsAt"
+      >
+    >
+  ): PeladaBooking | null {
+    const existing = this.getPeladaBooking(id);
+    if (!existing) return null;
+    const updated: PeladaBooking = {
+      ...existing,
+      ...patch,
+      sport: patch.sport != null ? resolveSport(patch.sport) : existing.sport,
+      id,
+      updatedAt: Date.now(),
+    };
+    this.db
+      .prepare(
+        `UPDATE pelada_bookings SET
+          name=@name, phone=@phone, scheduled_at=@scheduledAt, duration_minutes=@durationMinutes,
+          sport=@sport, status=@status, session_started_at=@sessionStartedAt,
+          session_ends_at=@sessionEndsAt, updated_at=@updatedAt
+         WHERE id=@id`
+      )
+      .run(updated);
+    return updated;
+  }
+
+  deletePeladaBooking(id: string): boolean {
+    const result = this.db.prepare("DELETE FROM pelada_bookings WHERE id = ?").run(id);
+    return result.changes > 0;
   }
 
   listTeams(): Team[] {
@@ -364,6 +551,7 @@ export class ArenaDatabase {
     const now = Date.now();
     const sponsor: Sponsor = {
       ...input,
+      tier: normalizeSponsorTier(input.tier),
       slots: normalizeSponsorSlots(input.slots),
       id: uuid(),
       createdAt: now,
@@ -388,6 +576,7 @@ export class ArenaDatabase {
     const updated: Sponsor = {
       ...existing,
       ...patch,
+      tier: normalizeSponsorTier(patch.tier ?? existing.tier),
       slots: normalizeSponsorSlots(patch.slots ?? existing.slots),
       id,
       updatedAt: Date.now(),
@@ -705,14 +894,13 @@ function mapSponsor(row: Record<string, unknown>): Sponsor {
   } catch {
     slotsRaw = [];
   }
-  const tier = row.tier === "master" ? "master" : "standard";
   const mediaType: SponsorMediaType = row.media_type === "video" ? "video" : "image";
   return {
     id: String(row.id),
     name: String(row.name),
     mediaUrl: (row.media_url as string | null) ?? null,
     mediaType,
-    tier: tier as SponsorTier,
+    tier: normalizeSponsorTier(row.tier),
     slots: normalizeSponsorSlots(slotsRaw),
     enabled: Boolean(row.enabled),
     createdAt: Number(row.created_at),
@@ -774,5 +962,24 @@ function mapEffect(row: Record<string, unknown>): Effect {
     useTeamColors: Boolean(row.use_team_colors),
     enabled: Boolean(row.enabled),
     sport: resolveEffectSport(row.sport),
+  };
+}
+
+function mapPeladaBooking(row: Record<string, unknown>): PeladaBooking {
+  const status = String(row.status) as PeladaBookingStatus;
+  return {
+    id: String(row.id),
+    name: String(row.name),
+    phone: String(row.phone),
+    pin: String(row.pin ?? ""),
+    scheduledAt: Number(row.scheduled_at),
+    durationMinutes: Number(row.duration_minutes),
+    sport: resolveSport(row.sport),
+    status:
+      status === "active" || status === "finished" || status === "cancelled" ? status : "scheduled",
+    sessionStartedAt: row.session_started_at == null ? null : Number(row.session_started_at),
+    sessionEndsAt: row.session_ends_at == null ? null : Number(row.session_ends_at),
+    createdAt: Number(row.created_at),
+    updatedAt: Number(row.updated_at),
   };
 }

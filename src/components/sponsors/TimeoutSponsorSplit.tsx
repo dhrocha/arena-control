@@ -22,14 +22,14 @@ export function TimeoutSponsorSplit({
   return (
     <div className="sponsor-timeout-split">
       <div className="sponsor-timeout-countdown">
-        <div className="sponsor-timeout-label">TIMEOUT {timeoutTeamName ?? ""}</div>
+        <div className="sponsor-timeout-label">TEMPO {timeoutTeamName ?? ""}</div>
         <div className="sponsor-timeout-clock">{countdownSeconds ?? "—"}</div>
         <div className="sponsor-timeout-score">
-          <span style={{ color: home?.secondaryColor }}>{home?.shortName ?? "HOME"}</span>
+          <span style={{ color: home?.secondaryColor }}>{home?.shortName ?? "CASA"}</span>
           <strong>
             {match.homeScore} — {match.awayScore}
           </strong>
-          <span style={{ color: away?.secondaryColor }}>{away?.shortName ?? "AWAY"}</span>
+          <span style={{ color: away?.secondaryColor }}>{away?.shortName ?? "FORA"}</span>
         </div>
       </div>
       <div className="sponsor-timeout-sponsor">

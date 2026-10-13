@@ -9,7 +9,9 @@ export function listLocalIPs(): Array<{ name: string; address: string; family: s
     if (!entries) continue;
     for (const entry of entries) {
       if (entry.internal) continue;
-      const family = typeof entry.family === "string" ? entry.family : `IPv${entry.family}`;
+      // Node typings: family is "IPv4" | "IPv6"; older runtimes used 4 | 6
+      const rawFamily = entry.family as string | number;
+      const family = typeof rawFamily === "string" ? rawFamily : `IPv${rawFamily}`;
       if (family !== "IPv4") continue;
       result.push({ name, address: entry.address, family });
     }
@@ -36,6 +38,7 @@ export function buildNetworkInfo(port: number): NetworkInfo {
       control: `${base}/control`,
       arena: `${base}/arena`,
       setup: `${base}/setup`,
+      pelada: `${base}/pelada`,
     },
   };
 }

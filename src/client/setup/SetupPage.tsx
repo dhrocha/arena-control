@@ -42,6 +42,13 @@ export function SetupPage() {
             <code>{network?.urls.control}</code>
           </div>
           <div>
+            <label>PELADA</label>
+            <code>{network?.urls.pelada}</code>
+            <Link className="btn-ghost" to="/pelada" target="_blank">
+              Abrir Pelada
+            </Link>
+          </div>
+          <div>
             <label>ARENA</label>
             <code>{network?.urls.arena}</code>
             <Link className="btn-primary" to="/arena" target="_blank">

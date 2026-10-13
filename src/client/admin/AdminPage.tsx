@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import type { MatchMode, Player, Sport, Team } from "@shared/types/index";
+import type { MatchEvent, Player, Sport, Team } from "@shared/types/index";
 import { setsToWin, type VolleyballFormat } from "@shared/sports/index";
 import { useArenaSocket } from "../../hooks/useArenaSocket";
 import { useMatchClock } from "../../hooks/useMatchClock";
@@ -15,6 +15,8 @@ import {
   type CreateMatchPayload,
 } from "../../sports/ui";
 import { describeEvent, formatEventTime } from "../../sports/eventLabels";
+import { countPlayerStat, playerStatLabel } from "../../sports/playerMatchStats";
+import { AdminPeladas } from "./AdminPeladas";
 import "./admin.css";
 
 export function AdminPage() {
@@ -31,7 +33,9 @@ export function AdminPage() {
   const controlUrl = state?.network.urls.control;
   const qr = useQrDataUrl(controlUrl);
   const [goalTeamId, setGoalTeamId] = useState<string | null>(null);
-  const [tab, setTab] = useState<"command" | "teams" | "history">("command");
+  const [mvpOpen, setMvpOpen] = useState(false);
+  const [mvpTeamId, setMvpTeamId] = useState<string | null>(null);
+  const [tab, setTab] = useState<"command" | "peladas" | "teams" | "history">("command");
   const [history, setHistory] = useState<Array<{ match: typeof match; events: unknown[] }>>([]);
   const [flash, setFlash] = useState<string | null>(null);
 
@@ -117,6 +121,9 @@ export function AdminPage() {
           <button type="button" className={tab === "command" ? "on" : ""} onClick={() => setTab("command")}>
             Comando
           </button>
+          <button type="button" className={tab === "peladas" ? "on" : ""} onClick={() => setTab("peladas")}>
+            Peladas
+          </button>
           <button type="button" className={tab === "teams" ? "on" : ""} onClick={() => setTab("teams")}>
             Times
           </button>
@@ -139,6 +146,11 @@ export function AdminPage() {
             label="CONTROLLER"
             ok={controllerOnline}
             detail={devices.filter((d) => d.role === "controller").length}
+          />
+          <StatusRow
+            label="PELADA"
+            ok={devices.some((d) => d.role === "pelada")}
+            detail={devices.filter((d) => d.role === "pelada").length}
           />
           {devices.length > 0 && (
             <div className="admin-devices-list">
@@ -411,11 +423,8 @@ export function AdminPage() {
                         label: "CRAQUE",
                         disabled: !match || !isGameDay,
                         onClick: () => {
-                          const first = state?.players.find(
-                            (p) => p.teamId === match?.homeTeamId || p.teamId === match?.awayTeamId
-                          );
-                          if (first) safeSend({ type: "SELECT_MVP", payload: { playerId: first.id } });
-                          else setFlash("Cadastre jogadores para escolher o Craque");
+                          setMvpTeamId(null);
+                          setMvpOpen(true);
                         },
                       },
                       {
@@ -499,6 +508,15 @@ export function AdminPage() {
           </>
         )}
 
+        {tab === "peladas" && (
+          <AdminPeladas
+            peladaSession={state?.peladaSession ?? null}
+            hasActiveMatch={Boolean(match && match.status !== "finished")}
+            send={safeSend}
+            onFlash={setFlash}
+          />
+        )}
+
         {tab === "teams" && (
           <AdminTeams
             stateTeams={state?.teams ?? []}
@@ -576,6 +594,121 @@ export function AdminPage() {
           </section>
         )}
       </main>
+
+      {mvpOpen && match && home && away && (
+        <MvpPickerModal
+          matchSport={match.sport}
+          home={home}
+          away={away}
+          players={state?.players ?? []}
+          events={state?.events ?? []}
+          selectedTeamId={mvpTeamId}
+          onSelectTeam={setMvpTeamId}
+          onClose={() => {
+            setMvpOpen(false);
+            setMvpTeamId(null);
+          }}
+          onSelectPlayer={(playerId) => {
+            safeSend({ type: "SELECT_MVP", payload: { playerId } });
+            setMvpOpen(false);
+            setMvpTeamId(null);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function MvpPickerModal({
+  matchSport,
+  home,
+  away,
+  players,
+  events,
+  selectedTeamId,
+  onSelectTeam,
+  onClose,
+  onSelectPlayer,
+}: {
+  matchSport: Sport;
+  home: Team;
+  away: Team;
+  players: Player[];
+  events: MatchEvent[];
+  selectedTeamId: string | null;
+  onSelectTeam: (teamId: string | null) => void;
+  onClose: () => void;
+  onSelectPlayer: (playerId: string) => void;
+}) {
+  const selectedTeam = selectedTeamId === away.id ? away : selectedTeamId === home.id ? home : null;
+  const teamPlayers = selectedTeam
+    ? players
+        .filter((p) => p.teamId === selectedTeam.id && p.active)
+        .slice()
+        .sort((a, b) => {
+          const diff =
+            countPlayerStat(matchSport, events, b.id) - countPlayerStat(matchSport, events, a.id);
+          return diff !== 0 ? diff : a.shirtNumber - b.shirtNumber;
+        })
+    : [];
+
+  return (
+    <div className="admin-mvp-overlay" role="dialog" aria-modal="true" aria-label="Craque da Partida">
+      <div className="admin-mvp-modal panel">
+        <header className="admin-mvp-header">
+          <div>
+            <h2>Craque da Partida</h2>
+            <p>{selectedTeam ? "Selecione o jogador" : "Escolha o time do craque"}</p>
+          </div>
+          <button type="button" className="btn-ghost" onClick={onClose}>
+            Fechar
+          </button>
+        </header>
+
+        {!selectedTeam ? (
+          <div className="admin-mvp-teams">
+            <button
+              type="button"
+              style={{ background: home.primaryColor, color: home.secondaryColor }}
+              onClick={() => onSelectTeam(home.id)}
+            >
+              {home.name}
+            </button>
+            <button
+              type="button"
+              style={{ background: away.primaryColor, color: away.secondaryColor }}
+              onClick={() => onSelectTeam(away.id)}
+            >
+              {away.name}
+            </button>
+          </div>
+        ) : (
+          <>
+            <button
+              type="button"
+              className="btn-ghost admin-mvp-back"
+              onClick={() => onSelectTeam(null)}
+            >
+              ← Trocar time ({selectedTeam.shortName})
+            </button>
+            <div className="admin-mvp-players">
+              {teamPlayers.length === 0 && <p>Nenhum jogador ativo neste time.</p>}
+              {teamPlayers.map((p) => {
+                const stat = countPlayerStat(matchSport, events, p.id);
+                return (
+                  <button key={p.id} type="button" onClick={() => onSelectPlayer(p.id)}>
+                    <span className="admin-mvp-num">{p.shirtNumber}</span>
+                    <span className="admin-mvp-meta">
+                      <strong>{p.nickname || p.name}</strong>
+                      <em>{playerStatLabel(matchSport, stat)}</em>
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 }
@@ -602,7 +735,6 @@ function CreateMatchInline({
   const [sport, setSport] = useState<Sport>("FOOTBALL");
   const [homeTeamId, setHomeTeamId] = useState("");
   const [awayTeamId, setAwayTeamId] = useState("");
-  const [mode, setMode] = useState<MatchMode>("gameday");
   const [duration, setDuration] = useState(defaultDuration);
   const [volleyCfg, setVolleyCfg] = useState(defaultVolleyballFormConfig);
 
@@ -610,7 +742,7 @@ function CreateMatchInline({
     const payload: CreateMatchPayload = {
       homeTeamId,
       awayTeamId,
-      mode,
+      mode: "gameday",
       duration: sport === "FOOTBALL" ? duration : defaultDuration,
       sport,
     };
@@ -670,13 +802,6 @@ function CreateMatchInline({
         </div>
       </div>
       <div className="grid-2">
-        <div className="field">
-          <label>Modo</label>
-          <select value={mode} onChange={(e) => setMode(e.target.value as MatchMode)}>
-            <option value="pelada">Pelada</option>
-            <option value="gameday">Game Day</option>
-          </select>
-        </div>
         {sport === "FOOTBALL" ? (
           <div className="field">
             <label>Duração (min)</label>

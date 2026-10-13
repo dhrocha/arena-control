@@ -3,12 +3,60 @@ import type { MatchSportState } from "../sports/volleyball/persist.ts";
 export type { MatchSportState };
 export type { VolleyballMatchState, VolleyballConfig, VolleyballSet } from "../sports/volleyball/types.ts";
 
-export type ClientRole = "admin" | "controller" | "arena";
+export type ClientRole = "admin" | "controller" | "arena" | "pelada";
 
 /** Sport of a match. Missing/legacy values are treated as FOOTBALL. */
 export type Sport = "FOOTBALL" | "VOLLEYBALL";
 
+/** Legacy "pelada" may still appear on finished historical matches. */
 export type MatchMode = "pelada" | "gameday";
+
+export type PeladaBookingStatus = "scheduled" | "active" | "finished" | "cancelled";
+
+export type PeladaPhase = "lobby" | "playing" | "paused" | "between_games" | "expired";
+
+export interface PeladaBooking {
+  id: string;
+  name: string;
+  phone: string;
+  /** Random access PIN for /pelada (generated at booking creation). */
+  pin: string;
+  scheduledAt: number;
+  durationMinutes: number;
+  sport: Sport;
+  status: PeladaBookingStatus;
+  sessionStartedAt: number | null;
+  sessionEndsAt: number | null;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface PeladaAdState {
+  sponsorId: string;
+  endsAt: number;
+}
+
+/** Live pelada session (not persisted; cleared when session ends). */
+export interface PeladaSession {
+  bookingId: string;
+  sport: Sport;
+  sessionEndsAt: number;
+  phase: PeladaPhase;
+  gameDurationSec: number;
+  team1Color: string;
+  team2Color: string;
+  team1Score: number;
+  team2Score: number;
+  /** Remaining ms when paused / between; ignored while playing (use gameStartedAt). */
+  gameRemainingMs: number;
+  /** Wall-clock start of current running segment; null when not playing. */
+  gameStartedAt: number | null;
+  /** Accumulated playing ms since last ad (for 60s ad cadence). */
+  playedSinceAdMs: number;
+  ad: PeladaAdState | null;
+  /** Master sponsor shown during lobby / pause / between_games. */
+  masterSponsorId: string | null;
+}
 
 /** Normalize unknown/legacy sport values to a valid Sport. */
 export function resolveSport(value: unknown): Sport {
@@ -79,7 +127,7 @@ export type EffectType =
   | "VOLLEY_MATCH_START"
   | "VOLLEY_SET_START";
 
-export type SponsorTier = "master" | "standard";
+export type SponsorTier = "master" | "oficial" | "parceiro" | "amigo";
 
 export type SponsorSlot = "idle" | "timeout" | "halftime" | "mvp" | "manual";
 
@@ -203,10 +251,23 @@ export interface Settings {
   theme: string;
   port: number;
   countdownSeconds: number;
-  /** Seconds each sponsor stays on idle / manual carousel. */
+  /**
+   * Fallback seconds for idle / manual carousel when a tier has no override.
+   * Prefer `sponsorTierSeconds` for per-tier durations.
+   */
   idleSponsorSeconds: number;
-  /** Seconds each sponsor stays on halftime carousel. */
+  /**
+   * Shared duration (seconds) during match contexts (intervalo, timeout…).
+   * Priority still applies; time is the same for every tier.
+   */
   halftimeSponsorSeconds: number;
+  /** Idle / manual carousel duration (seconds) per sponsorship tier. */
+  sponsorTierSeconds: Record<SponsorTier, number>;
+  /**
+   * Phone shown on pelada "Anuncie aqui" strip.
+   * Injected from ARENA_ADVERTISE_PHONE env (not persisted in DB).
+   */
+  advertisePhone: string;
 }
 
 export interface ClientInfo {
@@ -225,6 +286,7 @@ export interface NetworkInfo {
     control: string;
     arena: string;
     setup: string;
+    pelada: string;
   };
 }
 
@@ -241,6 +303,8 @@ export interface AppState {
   effects: Effect[];
   devices: ClientInfo[];
   activeControllerId: string | null;
+  /** Active controller for /pelada (separate from Game Day controller). */
+  peladaControllerId: string | null;
   serverTime: number;
   network: NetworkInfo;
   activeEffect: EffectPayload | null;
@@ -248,6 +312,8 @@ export interface AppState {
   sponsorDisplay: SponsorDisplayState | null;
   /** Sponsor chosen for the active volleyball timeout split. */
   timeoutSponsorId: string | null;
+  /** Live pelada session, or null when none. */
+  peladaSession: PeladaSession | null;
 }
 
 export interface EffectPayload {

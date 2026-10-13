@@ -73,7 +73,18 @@ export type ClientCommand =
         autoServer?: boolean;
         timeoutSeconds?: number;
       };
-    };
+    }
+  | { type: "PELADA_SESSION_START"; payload: { bookingId: string } }
+  | { type: "PELADA_SESSION_STOP"; payload?: Record<string, never> }
+  | {
+      type: "PELADA_CONFIG";
+      payload: { gameDurationSec: number; team1Color: string; team2Color: string };
+    }
+  | { type: "PELADA_GAME_START"; payload?: Record<string, never> }
+  | { type: "PELADA_GAME_PAUSE"; payload?: Record<string, never> }
+  | { type: "PELADA_GAME_RESUME"; payload?: Record<string, never> }
+  | { type: "PELADA_GAME_FINISH"; payload?: Record<string, never> }
+  | { type: "PELADA_SCORE"; payload: { team: 1 | 2; delta: 1 | -1 } };
 
 export type ServerMessage =
   | { type: "STATE_SYNC"; payload: AppState; ts: number }

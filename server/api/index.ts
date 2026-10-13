@@ -7,8 +7,22 @@ import type { ArenaDatabase } from "../db/database.ts";
 import { UPLOADS_DIR } from "../db/database.ts";
 import type { MatchEngine } from "../domain/MatchEngine.ts";
 import { eventBus } from "../domain/EventBus.ts";
-import type { Settings, Team, Player, Effect, Sponsor, SponsorMediaType } from "../../shared/types/index.ts";
-import { normalizeSponsorSlots } from "../../shared/sponsors/playlist.ts";
+import type {
+  Settings,
+  Team,
+  Player,
+  Effect,
+  Sponsor,
+  SponsorMediaType,
+  Sport,
+  PeladaBooking,
+} from "../../shared/types/index.ts";
+import { resolveSport } from "../../shared/types/index.ts";
+import {
+  normalizeSponsorSlots,
+  normalizeSponsorTier,
+  tierVacancyError,
+} from "../../shared/sponsors/playlist.ts";
 
 const storage = multer.diskStorage({
   destination: (_req, _file, cb) => cb(null, UPLOADS_DIR),
@@ -183,13 +197,22 @@ export function createApiRouter(db: ArenaDatabase, engine: MatchEngine): Express
       res.status(400).json({ error: "Nome obrigatório" });
       return;
     }
+    const tier = normalizeSponsorTier(body.tier);
+    const enabled = body.enabled ?? true;
+    if (enabled) {
+      const vacancy = tierVacancyError(db.listSponsors(), tier);
+      if (vacancy) {
+        res.status(400).json({ error: vacancy });
+        return;
+      }
+    }
     const sponsor = db.createSponsor({
       name: body.name,
       mediaUrl: body.mediaUrl ?? null,
       mediaType: body.mediaType === "video" ? "video" : "image",
-      tier: body.tier === "master" ? "master" : "standard",
+      tier,
       slots: normalizeSponsorSlots(body.slots),
-      enabled: body.enabled ?? true,
+      enabled,
     });
     eventBus.emit("STATE_CHANGED", null);
     engine.refreshIdleSponsors();
@@ -198,11 +221,25 @@ export function createApiRouter(db: ArenaDatabase, engine: MatchEngine): Express
 
   api.put("/sponsors/:id", (req, res) => {
     const body = req.body as Partial<Sponsor>;
+    const existing = db.getSponsor(req.params.id);
+    if (!existing) {
+      res.status(404).json({ error: "Patrocinador não encontrado" });
+      return;
+    }
     const patch: Partial<Sponsor> = { ...body };
     if (body.slots !== undefined) patch.slots = normalizeSponsorSlots(body.slots);
-    if (body.tier !== undefined) patch.tier = body.tier === "master" ? "master" : "standard";
+    if (body.tier !== undefined) patch.tier = normalizeSponsorTier(body.tier);
     if (body.mediaType !== undefined) {
       patch.mediaType = body.mediaType === "video" ? "video" : "image";
+    }
+    const nextTier = normalizeSponsorTier(patch.tier ?? existing.tier);
+    const nextEnabled = patch.enabled ?? existing.enabled;
+    if (nextEnabled) {
+      const vacancy = tierVacancyError(db.listSponsors(), nextTier, existing.id);
+      if (vacancy) {
+        res.status(400).json({ error: vacancy });
+        return;
+      }
     }
     const sponsor = db.updateSponsor(req.params.id, patch);
     if (!sponsor) {
@@ -240,6 +277,82 @@ export function createApiRouter(db: ArenaDatabase, engine: MatchEngine): Express
     eventBus.emit("STATE_CHANGED", null);
     engine.refreshIdleSponsors();
     res.json(sponsor);
+  });
+
+  api.get("/peladas", (_req, res) => {
+    res.json(db.listPeladaBookings());
+  });
+
+  api.get("/peladas/:id", (req, res) => {
+    const booking = db.getPeladaBooking(req.params.id);
+    if (!booking) {
+      res.status(404).json({ error: "Pelada não encontrada" });
+      return;
+    }
+    res.json(booking);
+  });
+
+  api.post("/peladas", (req, res) => {
+    const body = req.body as Partial<PeladaBooking> & { sport?: Sport };
+    if (!body.name || !body.phone || body.scheduledAt == null || body.durationMinutes == null) {
+      res.status(400).json({ error: "Campos obrigatórios ausentes" });
+      return;
+    }
+    const durationMinutes = Number(body.durationMinutes);
+    if (!Number.isFinite(durationMinutes) || durationMinutes < 1) {
+      res.status(400).json({ error: "Duração inválida" });
+      return;
+    }
+    const booking = db.createPeladaBooking({
+      name: String(body.name).trim(),
+      phone: String(body.phone).trim(),
+      scheduledAt: Number(body.scheduledAt),
+      durationMinutes,
+      sport: resolveSport(body.sport),
+    });
+    res.status(201).json(booking);
+  });
+
+  api.put("/peladas/:id", (req, res) => {
+    const existing = db.getPeladaBooking(req.params.id);
+    if (!existing) {
+      res.status(404).json({ error: "Pelada não encontrada" });
+      return;
+    }
+    if (existing.status === "active") {
+      res.status(400).json({ error: "Não é possível editar uma pelada ativa" });
+      return;
+    }
+    const body = req.body as Partial<PeladaBooking>;
+    const booking = db.updatePeladaBooking(req.params.id, {
+      name: body.name != null ? String(body.name).trim() : undefined,
+      phone: body.phone != null ? String(body.phone).trim() : undefined,
+      scheduledAt: body.scheduledAt != null ? Number(body.scheduledAt) : undefined,
+      durationMinutes: body.durationMinutes != null ? Number(body.durationMinutes) : undefined,
+      sport: body.sport != null ? resolveSport(body.sport) : undefined,
+      status: body.status === "cancelled" ? "cancelled" : undefined,
+    });
+    res.json(booking);
+  });
+
+  api.delete("/peladas/:id", (req, res) => {
+    const existing = db.getPeladaBooking(req.params.id);
+    if (!existing) {
+      res.status(404).json({ error: "Pelada não encontrada" });
+      return;
+    }
+    if (existing.status === "active") {
+      const session = engine.pelada.getSession();
+      if (session?.bookingId === existing.id) {
+        engine.pelada.stopSession(true);
+      }
+    }
+    const ok = db.deletePeladaBooking(req.params.id);
+    if (!ok) {
+      res.status(404).json({ error: "Pelada não encontrada" });
+      return;
+    }
+    res.json({ ok: true });
   });
 
   api.get("/matches", (_req, res) => {

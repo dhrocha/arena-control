@@ -2,6 +2,7 @@ import type { CSSProperties } from "react";
 import type { Match, Team } from "@shared/types/index";
 import { setsToWin } from "@shared/sports/index";
 import { useCountdownEndsAt } from "../../hooks/useCountdownEndsAt";
+import { displayText, specialStateLabel } from "../../lib/displayLabels";
 import "./volleyball-scoreboard.css";
 
 interface Props {
@@ -58,7 +59,7 @@ export function VolleyballScoreboard({ home, away, match, serverTime, compact }:
         {volley.status === "MATCH_FINISHED" || match.status === "finished"
           ? "FINAL"
           : volley.status === "TIMEOUT"
-            ? "TIMEOUT"
+            ? "TEMPO"
             : volley.status === "SET_FINISHED"
               ? "FIM DE SET"
               : deciding
@@ -68,7 +69,7 @@ export function VolleyballScoreboard({ home, away, match, serverTime, compact }:
 
       {volley.status === "TIMEOUT" && (
         <div className="vb-timeout-block">
-          <div className="vb-timeout-label">TIMEOUT {timeoutTeam?.shortName ?? ""}</div>
+          <div className="vb-timeout-label">TEMPO {timeoutTeam?.shortName ?? ""}</div>
           <div className="vb-timeout-clock">{timeoutLeft ?? volley.config.timeoutSeconds}</div>
           <div className="vb-timeout-score">
             {match.homeScore} — {match.awayScore}
@@ -77,19 +78,19 @@ export function VolleyballScoreboard({ home, away, match, serverTime, compact }:
       )}
 
       {special && volley.status !== "SET_FINISHED" && volley.status !== "MATCH_FINISHED" && (
-        <div className={`vb-special ${special.toLowerCase()}`}>{special.replace(/_/g, " ")}</div>
+        <div className={`vb-special ${special.toLowerCase()}`}>{specialStateLabel(special)}</div>
       )}
 
       <div className="vb-teams-row">
         <div className={`vb-side home ${serveHome ? "serving" : ""}`}>
           <Crest team={home} />
-          <strong>{home?.shortName ?? "HOME"}</strong>
-          {serveHome && <span className="vb-serve">● SERVE</span>}
+          <strong>{home?.shortName ?? "CASA"}</strong>
+          {serveHome && <span className="vb-serve">● SAQUE</span>}
         </div>
         <div className={`vb-side away ${serveAway ? "serving" : ""}`}>
           <Crest team={away} />
-          <strong>{away?.shortName ?? "AWAY"}</strong>
-          {serveAway && <span className="vb-serve">● SERVE</span>}
+          <strong>{away?.shortName ?? "FORA"}</strong>
+          {serveAway && <span className="vb-serve">● SAQUE</span>}
         </div>
       </div>
 
@@ -118,10 +119,10 @@ export function VolleyballScoreboard({ home, away, match, serverTime, compact }:
       {compact && (
         <div className="vb-status">
           {volley.status === "TIMEOUT"
-            ? "TIMEOUT"
+            ? "TEMPO"
             : match.status === "playing"
               ? "AO VIVO"
-              : match.status.toUpperCase()}
+              : displayText(match.status.replace(/_/g, " ").toUpperCase(), match.status.toUpperCase())}
         </div>
       )}
     </div>

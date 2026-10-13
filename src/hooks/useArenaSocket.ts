@@ -26,6 +26,7 @@ export function useArenaSocket(options: UseArenaSocketOptions) {
   const [lastEffect, setLastEffect] = useState<EffectPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [authenticated, setAuthenticated] = useState(role === "arena" || role === "admin");
+  // pelada / controller authenticate via PIN on HELLO
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const clientId = useRef(makeClientId(role));

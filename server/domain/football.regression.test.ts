@@ -37,15 +37,16 @@ describe("regressão futebol", () => {
     }).id;
   }
 
-  it("cria partida FOOTBALL por padrão sem sportState", () => {
+  it("cria partida FOOTBALL Game Day por padrão sem sportState", () => {
     setup();
     const match = engine.createMatch({
       homeTeamId: homeId,
       awayTeamId: awayId,
-      mode: "pelada",
+      mode: "gameday",
       duration: 40,
     });
     expect(match.sport).toBe("FOOTBALL");
+    expect(match.mode).toBe("gameday");
     expect(match.sportState).toBeNull();
     expect(match.status).toBe("setup");
     expect(match.homeScore).toBe(0);
@@ -56,10 +57,11 @@ describe("regressão futebol", () => {
     engine.createMatch({
       homeTeamId: homeId,
       awayTeamId: awayId,
-      mode: "pelada",
+      mode: "gameday",
       duration: 40,
     });
     engine.startMatch();
+    engine["beginPlaying"](db.getActiveMatch()!);
     let match = db.getActiveMatch()!;
     expect(match.status).toBe("playing");
 
@@ -88,10 +90,11 @@ describe("regressão futebol", () => {
     engine.createMatch({
       homeTeamId: homeId,
       awayTeamId: awayId,
-      mode: "pelada",
+      mode: "gameday",
       duration: 40,
     });
     engine.startMatch();
+    engine["beginPlaying"](db.getActiveMatch()!);
     engine.pauseMatch();
     expect(db.getActiveMatch()?.status).toBe("paused");
 
@@ -142,11 +145,12 @@ describe("regressão futebol", () => {
     engine.createMatch({
       homeTeamId: homeId,
       awayTeamId: awayId,
-      mode: "pelada",
+      mode: "gameday",
       duration: 40,
       sport: "VOLLEYBALL",
     });
     engine.startMatch();
+    engine["beginPlaying"](db.getActiveMatch()!);
     expect(() => engine.addGoal(homeId)).toThrow(/vôlei/i);
     expect(() => engine.halfTime()).toThrow(/vôlei/i);
   });
@@ -156,10 +160,11 @@ describe("regressão futebol", () => {
     const match = engine.createMatch({
       homeTeamId: homeId,
       awayTeamId: awayId,
-      mode: "pelada",
+      mode: "gameday",
       duration: 40,
     });
     engine.startMatch();
+    engine["beginPlaying"](db.getActiveMatch()!);
     engine.addGoal(homeId);
     engine.finishMatch();
 
