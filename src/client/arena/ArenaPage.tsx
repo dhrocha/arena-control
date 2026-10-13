@@ -1,13 +1,19 @@
 import { useEffect, useState } from "react";
+import { formatCountdownMs, getPeladaSessionRemainingMs } from "@shared/pelada/clock";
 import { useArenaSocket } from "../../hooks/useArenaSocket";
 import { Scoreboard } from "../../components/scoreboard/Scoreboard";
 import { VolleyballScoreboard } from "../../components/scoreboard/VolleyballScoreboard";
+import {
+  PeladaAdOverlay,
+  PeladaScoreboard,
+} from "../../components/scoreboard/PeladaScoreboard";
 import { EffectLayer } from "../../components/effects/EffectLayer";
 import {
   HorizontalSponsorLayout,
   useLocalClock,
 } from "../../components/sponsors/HorizontalSponsorLayout";
 import { TimeoutSponsorSplit } from "../../components/sponsors/TimeoutSponsorSplit";
+import { SponsorMedia } from "../../components/sponsors/SponsorMedia";
 import { audioManager } from "../../infrastructure/audio/AudioManager";
 import { useCountdownEndsAt } from "../../hooks/useCountdownEndsAt";
 import "./arena.css";
@@ -33,11 +39,21 @@ const AUDIO_URLS = [
   "/audio/volleyball-match-start.mp3",
 ];
 
+function useNow(tickMs = 250): number {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), tickMs);
+    return () => clearInterval(id);
+  }, [tickMs]);
+  return now;
+}
+
 export function ArenaPage() {
   const { connected, state, lastEffect } = useArenaSocket({ role: "arena" });
   const [ready, setReady] = useState(false);
   const [playedKey, setPlayedKey] = useState<string | null>(null);
   const clock = useLocalClock();
+  const now = useNow();
 
   useEffect(() => {
     void audioManager.preload(AUDIO_URLS);
@@ -58,17 +74,16 @@ export function ArenaPage() {
   }, [lastEffect, ready, playedKey]);
 
   const match = state?.match ?? null;
+  const pelada = state?.peladaSession ?? null;
   const home = match ? state?.teams.find((t) => t.id === match.homeTeamId) : null;
   const away = match ? state?.teams.find((t) => t.id === match.awayTeamId) : null;
   const volley = match?.sport === "VOLLEYBALL" ? match.sportState : null;
   const isTimeout = volley?.status === "TIMEOUT";
-  const timeoutLeft = useCountdownEndsAt(
-    isTimeout ? volley?.timeoutEndsAt : null,
-    state?.serverTime
-  );
+  const timeoutLeft = useCountdownEndsAt(isTimeout ? volley?.timeoutEndsAt : null);
 
   const isMicroPoint = lastEffect?.type === "VOLLEY_POINT";
-  const idleFx = !lastEffect || isMicroPoint;
+  const isPeladaBuzzer = Boolean(lastEffect?.metadata?.peladaBuzzer);
+  const idleFx = !lastEffect || isMicroPoint || isPeladaBuzzer;
   const arenaView = state?.arenaView ?? "scoreboard";
   const sponsorDisplay = state?.sponsorDisplay ?? null;
 
@@ -83,21 +98,50 @@ export function ArenaPage() {
     ? state.sponsors.find((s) => s.id === state.timeoutSponsorId)
     : null;
 
+  const peladaAdSponsor = pelada?.ad
+    ? state?.sponsors.find((s) => s.id === pelada.ad!.sponsorId)
+    : null;
+  const peladaMaster = pelada?.masterSponsorId
+    ? state?.sponsors.find((s) => s.id === pelada.masterSponsorId)
+    : null;
+
+  const showPelada =
+    Boolean(pelada) &&
+    idleFx &&
+    pelada!.phase !== "expired";
+
+  const showPeladaAd = showPelada && Boolean(pelada?.ad) && pelada!.phase === "playing";
+  const showPeladaMaster =
+    showPelada &&
+    !showPeladaAd &&
+    (pelada!.phase === "lobby" ||
+      pelada!.phase === "paused" ||
+      pelada!.phase === "between_games");
+  const showPeladaScoreboard =
+    showPelada && !showPeladaAd && !showPeladaMaster && pelada!.phase === "playing";
+
   const showSponsorCarousel =
-    idleFx && arenaView === "sponsor_carousel" && sponsorDisplay && currentSponsor;
+    !showPelada &&
+    idleFx &&
+    arenaView === "sponsor_carousel" &&
+    sponsorDisplay &&
+    currentSponsor;
   const showTimeoutSplit =
+    !showPelada &&
     idleFx &&
     match &&
     isTimeout &&
     arenaView === "scoreboard" &&
     !showSponsorCarousel;
   const showScoreboard =
+    !showPelada &&
     idleFx &&
     match &&
     arenaView === "scoreboard" &&
     !isTimeout &&
     !showSponsorCarousel;
   const showIdle =
+    !showPelada &&
     !lastEffect &&
     !showSponsorCarousel &&
     !showTimeoutSplit &&
@@ -119,6 +163,27 @@ export function ArenaPage() {
   };
 
   const arenaName = state?.settings.arenaName ?? "ARENA";
+  const advertisePhone = state?.settings.advertisePhone ?? "(11) 99999-9999";
+
+  const halftimeTop = {
+    left: "INTERVALO",
+    center: currentSponsor
+      ? `Apresentado por · ${currentSponsor.name}`
+      : "Apresentado por",
+    right: clock.time,
+  };
+
+  const halftimeBottom = match
+    ? {
+        left: home?.shortName ?? "CASA",
+        center: `${match.homeScore} — ${match.awayScore}`,
+        right: away?.shortName ?? "FORA",
+      }
+    : {
+        left: arenaName,
+        center: clock.date,
+        right: clock.time,
+      };
 
   return (
     <div className="arena-root">
@@ -140,22 +205,41 @@ export function ArenaPage() {
       {ready && (
         <>
           <div className="arena-stage">
+            {showPeladaAd && pelada && (
+              <PeladaAdOverlay
+                session={pelada}
+                now={now}
+                sponsorNode={<SponsorMedia sponsor={peladaAdSponsor} />}
+              />
+            )}
+            {showPeladaMaster && pelada && (
+              <HorizontalSponsorLayout
+                mode="idle"
+                sponsor={peladaMaster}
+                bottomStrip={{
+                  left:
+                    pelada.phase === "paused"
+                      ? "PAUSADO"
+                      : pelada.phase === "lobby"
+                        ? "AGUARDANDO"
+                        : "TROCA DE TIMES",
+                  center: `${pelada.team1Score} — ${pelada.team2Score}`,
+                  right: formatCountdownMs(getPeladaSessionRemainingMs(pelada, now)),
+                }}
+              />
+            )}
+            {showPeladaScoreboard && pelada && (
+              <PeladaScoreboard session={pelada} advertisePhone={advertisePhone} now={now} />
+            )}
+
             {showSponsorCarousel && sponsorDisplay && (
               <HorizontalSponsorLayout
                 mode={sponsorDisplay.mode}
                 sponsor={currentSponsor}
-                topStrip={
-                  sponsorDisplay.mode === "halftime"
-                    ? { center: "INTERVALO DA PARTIDA" }
-                    : undefined
-                }
+                topStrip={sponsorDisplay.mode === "halftime" ? halftimeTop : undefined}
                 bottomStrip={
-                  sponsorDisplay.mode === "halftime" && match
-                    ? {
-                        left: `${match.homeScore} — ${match.awayScore}`,
-                        center: clock.date,
-                        right: clock.time,
-                      }
+                  sponsorDisplay.mode === "halftime"
+                    ? halftimeBottom
                     : {
                         left: arenaName,
                         center: clock.date,
@@ -176,17 +260,17 @@ export function ArenaPage() {
             )}
             {showScoreboard &&
               (match.sport === "VOLLEYBALL" ? (
-                <VolleyballScoreboard home={home} away={away} match={match} serverTime={state?.serverTime} />
+                <VolleyballScoreboard home={home} away={away} match={match} />
               ) : (
-                <Scoreboard home={home} away={away} match={match} serverTime={state?.serverTime} />
+                <Scoreboard home={home} away={away} match={match} />
               ))}
             {showIdle && (
               <div className="arena-idle">
                 <div className="arena-idle-title">{arenaName}</div>
-                <div className="arena-idle-sub">{match ? "TELA LIMPA" : "AGUARDANDO PARTIDA"}</div>
+                <div className="arena-idle-sub">{clock.time}</div>
               </div>
             )}
-            <EffectLayer effect={lastEffect} state={state} />
+            <EffectLayer effect={isPeladaBuzzer ? null : lastEffect} state={state} />
           </div>
           <div className="arena-hud">
             <span className={`conn-dot ${connected ? "on" : ""}`} />

@@ -297,3 +297,14 @@ describe("configuração customizada", () => {
     expect(result.outcome).toBe("SET_END");
   });
 });
+
+describe("saque automático", () => {
+  it("ao pontuar, o saque passa para o time que marcou", () => {
+    let state = fresh();
+    state.serverTeamId = HOME;
+    const result = point(state, AWAY);
+    expect(result.state.serverTeamId).toBe(AWAY);
+    const again = point(result.state, HOME);
+    expect(again.state.serverTeamId).toBe(HOME);
+  });
+});

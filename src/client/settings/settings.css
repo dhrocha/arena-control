@@ -39,3 +39,28 @@
   color: var(--text-dim);
   font-size: 0.75rem;
 }
+
+.settings-tier-seconds {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.65rem;
+  margin-top: 0.35rem;
+}
+
+.settings-tier-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.settings-tier-field input {
+  width: 100%;
+}
+
+@media (max-width: 720px) {
+  .settings-tier-seconds {
+    grid-template-columns: 1fr 1fr;
+  }
+}

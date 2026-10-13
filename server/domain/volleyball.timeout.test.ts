@@ -41,12 +41,13 @@ describe("timeout vôlei", () => {
     engine.createMatch({
       homeTeamId: homeId,
       awayTeamId: awayId,
-      mode: "pelada",
+      mode: "gameday",
       duration: 40,
       sport: "VOLLEYBALL",
       volleyballConfig: { timeoutSeconds: 5 },
     });
     engine.startMatch();
+    engine["beginPlaying"](db.getActiveMatch()!);
     engine.startTimeout(homeId);
 
     let match = db.getActiveMatch()!;
@@ -84,12 +85,13 @@ describe("timeout vôlei", () => {
     engine.createMatch({
       homeTeamId: homeId,
       awayTeamId: awayId,
-      mode: "pelada",
+      mode: "gameday",
       duration: 40,
       sport: "VOLLEYBALL",
       volleyballConfig: { timeoutSeconds: 60 },
     });
     engine.startMatch();
+    engine["beginPlaying"](db.getActiveMatch()!);
     engine.startTimeout(awayId);
     engine.endTimeout();
     const match = db.getActiveMatch()!;

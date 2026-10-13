@@ -248,6 +248,32 @@
   background: var(--accent);
   color: #0a0e14;
   font-weight: 900;
+  flex-shrink: 0;
+}
+
+.ctrl-player-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.ctrl-player-meta strong {
+  font-weight: 800;
+}
+
+.ctrl-player-meta em {
+  font-style: normal;
+  font-size: 0.85rem;
+  opacity: 0.7;
+  font-weight: 600;
+}
+
+.ctrl-hint {
+  margin: 0 0 0.75rem;
+  opacity: 0.7;
+  font-size: 0.9rem;
+  font-weight: 600;
 }
 
 .ctrl-form {

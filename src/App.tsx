@@ -3,6 +3,7 @@ import { DashboardPage } from "./client/dashboard/DashboardPage";
 import { AdminPage } from "./client/admin/AdminPage";
 import { ControlPage } from "./client/control/ControlPage";
 import { ArenaPage } from "./client/arena/ArenaPage";
+import { PeladaPage } from "./client/pelada/PeladaPage";
 import { SetupPage } from "./client/setup/SetupPage";
 import { SettingsPage } from "./client/settings/SettingsPage";
 import { EffectsPage } from "./client/effects/EffectsPage";
@@ -15,6 +16,7 @@ export function App() {
         <Route path="/" element={<DashboardPage />} />
         <Route path="/admin" element={<AdminPage />} />
         <Route path="/control" element={<ControlPage />} />
+        <Route path="/pelada" element={<PeladaPage />} />
         <Route path="/arena" element={<ArenaPage />} />
         <Route path="/setup" element={<SetupPage />} />
         <Route path="/settings" element={<SettingsPage />} />

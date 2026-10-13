@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { MatchMode, Player, Sport, Team } from "@shared/types/index";
+import type { Player, Sport, Team } from "@shared/types/index";
 import { setsToWin, type VolleyballFormat } from "@shared/sports/index";
 import { useArenaSocket } from "../../hooks/useArenaSocket";
 import { useMatchClock } from "../../hooks/useMatchClock";
@@ -10,6 +10,7 @@ import {
   sportTitle,
   type CreateMatchPayload,
 } from "../../sports/ui";
+import { countPlayerStat, playerStatLabel } from "../../sports/playerMatchStats";
 import "./control.css";
 
 type Screen =
@@ -19,6 +20,7 @@ type Screen =
   | "pick-scorer"
   | "pick-point-player"
   | "mvp"
+  | "mvp-players"
   | "teams"
   | "team-form"
   | "players"
@@ -45,6 +47,7 @@ export function ControlPage() {
   const [enabled, setEnabled] = useState(Boolean(savedPin));
   const [screen, setScreen] = useState<Screen>(savedPin ? "home" : "pin");
   const [goalTeamId, setGoalTeamId] = useState<string | null>(null);
+  const [mvpTeamId, setMvpTeamId] = useState<string | null>(null);
   const [editingTeam, setEditingTeam] = useState<Team | null>(null);
   const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
 
@@ -229,34 +232,106 @@ export function ControlPage() {
     );
   }
 
-  if (screen === "mvp" && match) {
-    const players = (state?.players ?? []).filter(
-      (p) => (p.teamId === match.homeTeamId || p.teamId === match.awayTeamId) && p.active
-    );
-    return (
-      <div className="ctrl-root">
-        <header className="ctrl-top">
-          <button type="button" className="btn-ghost" onClick={() => setScreen("home")}>
-            ←
-          </button>
-          <h1>Craque da Partida</h1>
-          <Conn connected={connected} />
-        </header>
-        <div className="ctrl-list">
-          {players.map((p) => (
+  if ((screen === "mvp" || screen === "mvp-players") && match && home && away) {
+    const events = state?.events ?? [];
+    const mvpTeam = mvpTeamId === away.id ? away : mvpTeamId === home.id ? home : null;
+
+    if (screen === "mvp" || !mvpTeam) {
+      return (
+        <div className="ctrl-root">
+          <header className="ctrl-top">
             <button
-              key={p.id}
               type="button"
-              className="ctrl-player-btn"
+              className="btn-ghost"
               onClick={() => {
-                safeSend({ type: "SELECT_MVP", payload: { playerId: p.id } });
+                setMvpTeamId(null);
                 setScreen("home");
               }}
             >
-              <span className="num">{p.shirtNumber}</span>
-              <span>{p.nickname || p.name}</span>
+              ←
             </button>
-          ))}
+            <h1>Craque da Partida</h1>
+            <Conn connected={connected} />
+          </header>
+          <p className="ctrl-hint">Escolha o time do craque</p>
+          <section className="ctrl-goals">
+            <button
+              type="button"
+              className="btn-lg"
+              style={{ background: home.primaryColor, color: home.secondaryColor }}
+              onClick={() => {
+                setMvpTeamId(home.id);
+                setScreen("mvp-players");
+              }}
+            >
+              {home.name}
+            </button>
+            <button
+              type="button"
+              className="btn-lg"
+              style={{ background: away.primaryColor, color: away.secondaryColor }}
+              onClick={() => {
+                setMvpTeamId(away.id);
+                setScreen("mvp-players");
+              }}
+            >
+              {away.name}
+            </button>
+          </section>
+        </div>
+      );
+    }
+
+    const players = (state?.players ?? [])
+      .filter((p) => p.teamId === mvpTeam.id && p.active)
+      .slice()
+      .sort((a, b) => {
+        const diff =
+          countPlayerStat(match.sport, events, b.id) - countPlayerStat(match.sport, events, a.id);
+        return diff !== 0 ? diff : a.shirtNumber - b.shirtNumber;
+      });
+
+    return (
+      <div className="ctrl-root">
+        <header className="ctrl-top">
+          <button
+            type="button"
+            className="btn-ghost"
+            onClick={() => {
+              setMvpTeamId(null);
+              setScreen("mvp");
+            }}
+          >
+            ←
+          </button>
+          <h1>{mvpTeam.shortName}</h1>
+          <Conn connected={connected} />
+        </header>
+        <p className="ctrl-hint">Selecione o jogador</p>
+        <div className="ctrl-list">
+          {players.length === 0 && <p className="ctrl-hint">Nenhum jogador ativo neste time.</p>}
+          {players.map((p) => {
+            const stat = countPlayerStat(match.sport, events, p.id);
+            return (
+              <button
+                key={p.id}
+                type="button"
+                className="ctrl-player-btn"
+                onClick={() => {
+                  if (safeSend({ type: "SELECT_MVP", payload: { playerId: p.id } })) {
+                    setMvpTeamId(null);
+                    setScreen("home");
+                  }
+                }}
+              >
+                <span className="num">{p.shirtNumber}</span>
+                <span className="ctrl-player-meta">
+                  <strong>{p.nickname || p.name}</strong>
+                  <em>{playerStatLabel(match.sport, stat)}</em>
+                </span>
+              </button>
+            );
+          })}
         </div>
       </div>
     );
@@ -320,7 +395,7 @@ export function ControlPage() {
         <div>
           <div className="ctrl-mode">
             {match ? sportTitle(match.sport) : "ARENA"}
-            {match ? ` · ${isGameDay ? "GAME DAY" : "PELADA"}` : ""}
+            {match ? " · GAME DAY" : ""}
           </div>
           <h1>{state?.settings.arenaName ?? "Arena"}</h1>
         </div>
@@ -372,7 +447,14 @@ export function ControlPage() {
               <p className="ctrl-finished-msg">PARTIDA ENCERRADA</p>
               <section className="ctrl-row">
                 {isGameDay && (
-                  <button type="button" className="btn-lg" onClick={() => setScreen("mvp")}>
+                  <button
+                    type="button"
+                    className="btn-lg"
+                    onClick={() => {
+                      setMvpTeamId(null);
+                      setScreen("mvp");
+                    }}
+                  >
                     CRAQUE
                   </button>
                 )}
@@ -552,7 +634,13 @@ export function ControlPage() {
                   </button>
                 )}
                 {isGameDay && match.status !== "setup" && (
-                  <button type="button" onClick={() => setScreen("mvp")}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMvpTeamId(null);
+                      setScreen("mvp");
+                    }}
+                  >
                     CRAQUE
                   </button>
                 )}
@@ -742,7 +830,6 @@ function NewMatchScreen({
   const [teams, setTeams] = useState<Team[]>(teamsFromState);
   const [homeTeamId, setHomeTeamId] = useState("");
   const [awayTeamId, setAwayTeamId] = useState("");
-  const [mode, setMode] = useState<MatchMode>("gameday");
   const [duration, setDuration] = useState(defaultDuration);
   const [volleyCfg, setVolleyCfg] = useState(defaultVolleyballFormConfig);
   const [loading, setLoading] = useState(teamsFromState.length === 0);
@@ -777,7 +864,7 @@ function NewMatchScreen({
     const payload: CreateMatchPayload = {
       homeTeamId,
       awayTeamId,
-      mode,
+      mode: "gameday",
       duration: sport === "FOOTBALL" ? duration : defaultDuration,
       sport,
     };
@@ -861,18 +948,6 @@ function NewMatchScreen({
             ))}
           </select>
         </div>
-        <div className="field">
-          <label>Modo</label>
-          <div className="ctrl-mode-pick">
-            <button type="button" className={mode === "pelada" ? "on" : ""} onClick={() => setMode("pelada")}>
-              PELADA
-            </button>
-            <button type="button" className={mode === "gameday" ? "on" : ""} onClick={() => setMode("gameday")}>
-              GAME DAY
-            </button>
-          </div>
-        </div>
-
         {sport === "FOOTBALL" && (
           <div className="field">
             <label>Duração (min)</label>

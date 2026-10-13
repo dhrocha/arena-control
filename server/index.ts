@@ -74,6 +74,7 @@ async function main(): Promise<void> {
     }
     console.log(`  Admin:   ${network.urls.admin}`);
     console.log(`  Control: ${network.urls.control}`);
+    console.log(`  Pelada:  ${network.urls.pelada}`);
     console.log(`  Arena:   ${network.urls.arena}`);
     console.log(`  Setup:   ${network.urls.setup}`);
     console.log("═══════════════════════════════════════");

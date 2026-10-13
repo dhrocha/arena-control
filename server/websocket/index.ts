@@ -110,6 +110,18 @@ function handleCommand(
       authenticated = true;
     }
 
+    if (role === "pelada") {
+      if (!pin || !engine.verifyPeladaPin(pin)) {
+        send(ws, {
+          type: "ERROR",
+          payload: { code: "AUTH", message: "PIN da pelada inválido" },
+          ts: Date.now(),
+        });
+        return;
+      }
+      authenticated = true;
+    }
+
     // Substitui conexão anterior do mesmo clientId (reconnect)
     for (const [existingWs, existing] of clients) {
       if (existing.id === clientId && existingWs !== ws) {
@@ -155,10 +167,21 @@ function handleCommand(
     return;
   }
 
+  if (client.role === "pelada" && isMatchCommand(cmd.type)) {
+    send(ws, {
+      type: "ERROR",
+      payload: { code: "FORBIDDEN", message: "Use os comandos de pelada" },
+      ts: Date.now(),
+    });
+    return;
+  }
+
   if (!engine.canControl(client.id, client.role) && isMatchCommand(cmd.type)) {
     // Auto-claim: último controller que tentar comandar assume o controle
     if (client.role === "controller") {
       engine.claimControl(client.id);
+    } else if (client.role === "pelada") {
+      engine.pelada.claimPeladaControl(client.id);
     } else {
       send(ws, {
         type: "ERROR",
@@ -169,16 +192,53 @@ function handleCommand(
     }
   }
 
+  if (isPeladaCommand(cmd.type) && client.role === "pelada" && !engine.canControl(client.id, client.role)) {
+    engine.pelada.claimPeladaControl(client.id);
+  }
+
+  if (isPeladaCommand(cmd.type) && client.role !== "admin" && client.role !== "pelada") {
+    send(ws, {
+      type: "ERROR",
+      payload: { code: "FORBIDDEN", message: "Comando de pelada não permitido" },
+      ts: Date.now(),
+    });
+    return;
+  }
+
+  if (
+    (cmd.type === "PELADA_SESSION_START" || cmd.type === "PELADA_SESSION_STOP") &&
+    client.role !== "admin"
+  ) {
+    send(ws, {
+      type: "ERROR",
+      payload: { code: "FORBIDDEN", message: "Somente admin pode iniciar/encerrar a sessão" },
+      ts: Date.now(),
+    });
+    return;
+  }
+
   try {
     switch (cmd.type) {
-      case "AUTH_PIN":
-        if (!engine.verifyPin(cmd.payload.pin)) {
-          send(ws, { type: "ERROR", payload: { code: "AUTH", message: "PIN inválido" }, ts: Date.now() });
+      case "AUTH_PIN": {
+        const ok =
+          client.role === "pelada"
+            ? engine.verifyPeladaPin(cmd.payload.pin)
+            : engine.verifyPin(cmd.payload.pin);
+        if (!ok) {
+          send(ws, {
+            type: "ERROR",
+            payload: {
+              code: "AUTH",
+              message: client.role === "pelada" ? "PIN da pelada inválido" : "PIN inválido",
+            },
+            ts: Date.now(),
+          });
           return;
         }
         client.authenticated = true;
         send(ws, { type: "AUTH_OK", payload: { role: client.role }, ts: Date.now() });
         break;
+      }
       case "MATCH_CREATE":
         engine.createMatch(cmd.payload);
         break;
@@ -257,6 +317,30 @@ function handleCommand(
       case "SET_VOLLEYBALL_OPTIONS":
         engine.setVolleyballOptions(cmd.payload);
         break;
+      case "PELADA_SESSION_START":
+        engine.pelada.startSession(cmd.payload.bookingId);
+        break;
+      case "PELADA_SESSION_STOP":
+        engine.pelada.stopSession(true);
+        break;
+      case "PELADA_CONFIG":
+        engine.pelada.configure(cmd.payload);
+        break;
+      case "PELADA_GAME_START":
+        engine.pelada.startGame();
+        break;
+      case "PELADA_GAME_PAUSE":
+        engine.pelada.pauseGame();
+        break;
+      case "PELADA_GAME_RESUME":
+        engine.pelada.resumeGame();
+        break;
+      case "PELADA_GAME_FINISH":
+        engine.pelada.finishGame(false);
+        break;
+      case "PELADA_SCORE":
+        engine.pelada.adjustScore(cmd.payload.team, cmd.payload.delta);
+        break;
       default:
         send(ws, {
           type: "ERROR",
@@ -300,5 +384,18 @@ function isMatchCommand(type: string): boolean {
     "TIMEOUT_START",
     "TIMEOUT_END",
     "SET_VOLLEYBALL_OPTIONS",
+  ].includes(type);
+}
+
+function isPeladaCommand(type: string): boolean {
+  return [
+    "PELADA_SESSION_START",
+    "PELADA_SESSION_STOP",
+    "PELADA_CONFIG",
+    "PELADA_GAME_START",
+    "PELADA_GAME_PAUSE",
+    "PELADA_GAME_RESUME",
+    "PELADA_GAME_FINISH",
+    "PELADA_SCORE",
   ].includes(type);
 }

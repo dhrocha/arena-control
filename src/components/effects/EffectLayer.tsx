@@ -1,5 +1,6 @@
 import { AnimatePresence, motion } from "framer-motion";
 import type { AppState, EffectPayload, EffectType, Player, Sponsor, Team } from "@shared/types/index";
+import { displayText } from "../../lib/displayLabels";
 import { SponsorMedia } from "../sponsors/SponsorMedia";
 import "../sponsors/sponsors-display.css";
 import "./effects.css";
@@ -35,11 +36,11 @@ export function EffectLayer({ effect, state }: Props) {
         {effect.type === "COUNTDOWN" && <CountdownEffect value={effect.countdownValue ?? 0} />}
         {effect.type === "TEAM_INTRO" && <TeamIntroEffect home={home} away={away} />}
         {effect.type === "MATCH_START" && (
-          <BannerEffect text={effect.text ?? "MATCH START"} accent={effect.secondaryColor} />
+          <BannerEffect text={displayText(effect.text, "INÍCIO")} accent={effect.secondaryColor} />
         )}
         {effect.type === "HALF_TIME" && (
           <ScoreBanner
-            title="HALF TIME"
+            title={displayText(effect.text, "INTERVALO")}
             home={home}
             away={away}
             homeScore={effect.homeScore ?? state.match?.homeScore ?? 0}
@@ -55,29 +56,28 @@ export function EffectLayer({ effect, state }: Props) {
           />
         )}
         {(effect.type === "MVP" || effect.type === "VOLLEY_MVP") && (
-          <MvpEffect
-            team={team}
-            player={player}
+          <MvpEffect team={team} player={player} />
+        )}
+        {effect.type === "MVP_TEASE" && (
+          <MvpTeaseEffect text={displayText(effect.text, "O CRAQUE DA PARTIDA")} />
+        )}
+        {effect.type === "MVP_SPONSOR" && (
+          <MvpSponsorEffect
+            text={displayText(effect.text, "APRESENTADO POR")}
             sponsor={
               typeof effect.metadata?.sponsorId === "string"
                 ? state.sponsors.find((s) => s.id === effect.metadata?.sponsorId)
                 : undefined
             }
-          />
-        )}
-        {effect.type === "MVP_TEASE" && <MvpTeaseEffect text={effect.text ?? "O CRAQUE DA PARTIDA"} />}
-        {effect.type === "MVP_SPONSOR" && (
-          <MvpSponsorEffect
-            text={effect.text ?? "APRESENTADO POR"}
-            sponsor={
-              typeof effect.metadata?.sponsorId === "string"
-                ? state.sponsors.find((s) => s.id === effect.metadata?.sponsorId)
+            sponsorName={
+              typeof effect.metadata?.sponsorName === "string"
+                ? effect.metadata.sponsorName
                 : undefined
             }
           />
         )}
         {(effect.type === "PENALTY" || effect.type === "CARD" || effect.type === "CUSTOM") && (
-          <BannerEffect text={effect.text ?? effect.type} accent={effect.secondaryColor} />
+          <BannerEffect text={displayText(effect.text, effect.type)} accent={effect.secondaryColor} />
         )}
 
         {effect.type === "VOLLEY_POINT" && (
@@ -91,7 +91,7 @@ export function EffectLayer({ effect, state }: Props) {
         )}
         {effect.type === "VOLLEY_SET_POINT" && (
           <VolleySpecialBanner
-            label="SET POINT"
+            label="PONTO DE SET"
             effect={effect}
             team={team}
             home={home}
@@ -101,7 +101,7 @@ export function EffectLayer({ effect, state }: Props) {
         )}
         {effect.type === "VOLLEY_MATCH_POINT" && (
           <VolleySpecialBanner
-            label="MATCH POINT"
+            label="PONTO DE PARTIDA"
             effect={effect}
             team={team}
             home={home}
@@ -111,7 +111,7 @@ export function EffectLayer({ effect, state }: Props) {
         )}
         {effect.type === "VOLLEY_DEUCE" && (
           <VolleySpecialBanner
-            label="DEUCE"
+            label="EMPATE"
             effect={effect}
             team={null}
             home={home}
@@ -121,7 +121,7 @@ export function EffectLayer({ effect, state }: Props) {
         )}
         {effect.type === "VOLLEY_TIMEOUT" && (
           <VolleySpecialBanner
-            label="TIMEOUT"
+            label="TEMPO"
             effect={effect}
             team={team}
             home={home}
@@ -220,18 +220,18 @@ function VolleySpecialBanner({
         animate={{ y: 0, opacity: 1, scale: 1 }}
         transition={{ type: "spring", stiffness: 200, damping: 16 }}
       >
-        {effect.text ?? label}
+        {displayText(effect.text, label)}
       </motion.div>
       {team && <div className="fx-volley-special-team">{team.name}</div>}
       {tone === "timeout" && timeoutSeconds != null && (
         <div className="fx-volley-special-timeout">{timeoutSeconds}s</div>
       )}
       <div className="fx-volley-special-score">
-        <span>{home?.shortName ?? "HOME"}</span>
+        <span>{home?.shortName ?? "CASA"}</span>
         <strong>
           {effect.homeScore ?? 0} — {effect.awayScore ?? 0}
         </strong>
-        <span>{away?.shortName ?? "AWAY"}</span>
+        <span>{away?.shortName ?? "FORA"}</span>
       </div>
     </div>
   );
@@ -266,7 +266,7 @@ function VolleySetEndEffect({
         {team?.logo ? <img src={team.logo} alt="" /> : <span>{team?.shortName}</span>}
       </motion.div>
       <motion.h1 initial={{ y: 40, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.12 }}>
-        {effect.text ?? "SET WON"}
+        {displayText(effect.text, "FIM DE SET")}
       </motion.h1>
       <h2 style={{ color: team?.secondaryColor }}>{team?.name}</h2>
       <div className="fx-volley-set-end-score">
@@ -312,14 +312,14 @@ function VolleyMatchEndEffect({
         background: `linear-gradient(165deg, ${team?.primaryColor ?? "#0a0e14"}, #05070b 70%)`,
       }}
     >
-      <div className="fx-volley-match-end-label">{effect.text ?? "MATCH WON"}</div>
+      <div className="fx-volley-match-end-label">{displayText(effect.text, "FIM DA PARTIDA")}</div>
       <motion.h1
         initial={{ scale: 0.8, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         transition={{ type: "spring", stiffness: 140 }}
         style={{ color: team?.secondaryColor }}
       >
-        {team?.name ?? "WINNER"}
+        {team?.name ?? "VENCEDOR"}
       </motion.h1>
       <div className="fx-volley-match-end-sets">
         <strong>{effect.homeScore ?? 0}</strong>
@@ -353,17 +353,17 @@ function VolleyMatchStartEffect({
 }) {
   return (
     <div className="fx-volley-match-start">
-      <div className="fx-volley-match-start-eyebrow">{text ?? "GAME DAY"}</div>
-      <div className="fx-volley-match-start-sport">VOLLEYBALL</div>
+      <div className="fx-volley-match-start-eyebrow">{displayText(text, "DIA DE JOGO")}</div>
+      <div className="fx-volley-match-start-sport">VÔLEI</div>
       <div className="fx-volley-match-start-row">
         <div>
           {home?.logo && <img src={home.logo} alt="" />}
-          <h2>{home?.name ?? "HOME"}</h2>
+          <h2>{home?.name ?? "CASA"}</h2>
         </div>
         <span>VS</span>
         <div>
           {away?.logo && <img src={away.logo} alt="" />}
-          <h2>{away?.name ?? "AWAY"}</h2>
+          <h2>{away?.name ?? "FORA"}</h2>
         </div>
       </div>
     </div>
@@ -395,7 +395,7 @@ function VolleySetStartEffect({
           <em>{setsAway} SET{setsAway === 1 ? "" : "S"}</em>
         </div>
       </div>
-      <div className="fx-volley-set-start-ready">READY?</div>
+      <div className="fx-volley-set-start-ready">PRONTOS?</div>
     </div>
   );
 }
@@ -478,7 +478,7 @@ function CountdownEffect({ value }: { value: number }) {
       >
         {value}
       </motion.div>
-      <div className="fx-countdown-label">GAME DAY</div>
+      <div className="fx-countdown-label">DIA DE JOGO</div>
     </div>
   );
 }
@@ -488,12 +488,12 @@ function TeamIntroEffect({ home, away }: { home?: Team | null; away?: Team | nul
     <div className="fx-intro">
       <div className="fx-intro-side" style={{ background: home?.primaryColor ?? "#111" }}>
         {home?.logo && <img src={home.logo} alt="" />}
-        <h2 style={{ color: home?.secondaryColor }}>{home?.name ?? "HOME"}</h2>
+        <h2 style={{ color: home?.secondaryColor }}>{home?.name ?? "CASA"}</h2>
       </div>
       <div className="fx-intro-vs">VS</div>
       <div className="fx-intro-side right" style={{ background: away?.primaryColor ?? "#222" }}>
         {away?.logo && <img src={away.logo} alt="" />}
-        <h2 style={{ color: away?.secondaryColor }}>{away?.name ?? "AWAY"}</h2>
+        <h2 style={{ color: away?.secondaryColor }}>{away?.name ?? "FORA"}</h2>
       </div>
     </div>
   );
@@ -526,11 +526,11 @@ function ScoreBanner({
     <div className="fx-score-banner">
       <div className="fx-score-title">{title}</div>
       <div className="fx-score-row">
-        <span>{home?.shortName ?? "HOME"}</span>
+        <span>{home?.shortName ?? "CASA"}</span>
         <strong>
           {homeScore} — {awayScore}
         </strong>
-        <span>{away?.shortName ?? "AWAY"}</span>
+        <span>{away?.shortName ?? "FORA"}</span>
       </div>
     </div>
   );
@@ -568,7 +568,7 @@ function MatchEndEffect({
           animate={{ y: 0, opacity: 1 }}
           transition={{ delay: 0.4 }}
         >
-          <span>WINNER</span>
+          <span>VENCEDOR</span>
           <h2 style={{ color: winner.secondaryColor }}>{winner.name}</h2>
         </motion.div>
       )}
@@ -584,11 +584,9 @@ function MatchEndEffect({
 function MvpEffect({
   team,
   player,
-  sponsor,
 }: {
   team?: Team | null;
   player?: Player | null;
-  sponsor?: Sponsor | null;
 }) {
   return (
     <div
@@ -603,12 +601,6 @@ function MvpEffect({
       </div>
       <h1>{player?.nickname || player?.name}</h1>
       <h2 style={{ color: team?.secondaryColor }}>{team?.name}</h2>
-      {sponsor?.mediaUrl && (
-        <div className="fx-mvp-footer">
-          <span>Apresentado por</span>
-          <SponsorMedia sponsor={sponsor} />
-        </div>
-      )}
     </div>
   );
 }
@@ -626,14 +618,25 @@ function MvpTeaseEffect({ text }: { text: string }) {
   );
 }
 
-function MvpSponsorEffect({ text, sponsor }: { text: string; sponsor?: Sponsor | null }) {
+function MvpSponsorEffect({
+  text,
+  sponsor,
+  sponsorName,
+}: {
+  text: string;
+  sponsor?: Sponsor | null;
+  sponsorName?: string;
+}) {
+  const name = sponsorName || sponsor?.name;
   return (
-    <div className="fx-mvp-sponsor">
-      <div className="label">{text}</div>
-      <div className="logo-wrap">
+    <div className="fx-mvp-sponsor-layout">
+      <div className="fx-mvp-sponsor-top">
+        <strong>{text}</strong>
+        {name ? <span>{name}</span> : null}
+      </div>
+      <div className="fx-mvp-sponsor-stage">
         <SponsorMedia sponsor={sponsor} />
       </div>
-      {sponsor?.name && <div className="label" style={{ opacity: 0.7, letterSpacing: "0.08em" }}>{sponsor.name}</div>}
     </div>
   );
 }

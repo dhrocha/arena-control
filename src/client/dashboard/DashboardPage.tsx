@@ -41,7 +41,11 @@ export function DashboardPage() {
         </Link>
         <Link className="dash-card" to="/control">
           <strong>Control</strong>
-          <span>Celular / tablet</span>
+          <span>Game Day (celular)</span>
+        </Link>
+        <Link className="dash-card" to="/pelada">
+          <strong>Pelada</strong>
+          <span>Controle com PIN</span>
         </Link>
         <Link className="dash-card" to="/arena">
           <strong>Arena</strong>

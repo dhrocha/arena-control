@@ -38,7 +38,7 @@ export interface VolleyballConfig {
   normalSetPoints: number;
   decidingSetPoints: number;
   minDifference: number;
-  /** Optional side-out automation (MVP: manual serve always works). */
+  /** When true (default), scoring team automatically gets the serve. */
   autoServer: boolean;
   timeoutSeconds: number;
   pointSoundEnabled: boolean;
@@ -100,7 +100,7 @@ export const DEFAULT_VOLLEYBALL_CONFIG: VolleyballConfig = {
   normalSetPoints: 25,
   decidingSetPoints: 15,
   minDifference: 2,
-  autoServer: false,
+  autoServer: true,
   timeoutSeconds: 30,
   pointSoundEnabled: true,
 };

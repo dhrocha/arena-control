@@ -1,6 +1,11 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import type { Settings } from "@shared/types/index";
+import type { Settings, SponsorTier } from "@shared/types/index";
+import {
+  DEFAULT_SPONSOR_TIER_SECONDS,
+  SPONSOR_TIER_LABELS,
+  SPONSOR_TIER_ORDER,
+} from "@shared/sponsors/playlist";
 import "./settings.css";
 
 export function SettingsPage() {
@@ -139,23 +144,45 @@ export function SettingsPage() {
               onChange={(e) => update("halfTimeDuration", Number(e.target.value))}
             />
           </div>
-          <div className="field">
-            <label>Patrocínio idle (s)</label>
-            <input
-              type="number"
-              value={settings.idleSponsorSeconds ?? 180}
-              onChange={(e) => update("idleSponsorSeconds", Number(e.target.value))}
-            />
-            <small>Tempo de cada arte na tela sem jogos / botão manual.</small>
+          <div className="field" style={{ gridColumn: "1 / -1" }}>
+            <label>Tempo no carrossel por nível (s)</label>
+            <div className="settings-tier-seconds">
+              {SPONSOR_TIER_ORDER.map((tier) => (
+                <label key={tier} className="settings-tier-field">
+                  <span>{SPONSOR_TIER_LABELS[tier]}</span>
+                  <input
+                    type="number"
+                    min={3}
+                    value={
+                      settings.sponsorTierSeconds?.[tier] ??
+                      DEFAULT_SPONSOR_TIER_SECONDS[tier]
+                    }
+                    onChange={(e) => {
+                      const value = Number(e.target.value) || DEFAULT_SPONSOR_TIER_SECONDS[tier];
+                      const next = {
+                        ...(settings.sponsorTierSeconds ?? DEFAULT_SPONSOR_TIER_SECONDS),
+                        [tier]: value,
+                      } as Record<SponsorTier, number>;
+                      update("sponsorTierSeconds", next);
+                    }}
+                  />
+                </label>
+              ))}
+            </div>
+            <small>
+              Usado na tela sem jogos e no botão manual. Ordem: Master → Oficial → Parceiro → Amigo.
+            </small>
           </div>
           <div className="field">
-            <label>Patrocínio intervalo (s)</label>
+            <label>Patrocínio durante o jogo (s)</label>
             <input
               type="number"
-              value={settings.halftimeSponsorSeconds ?? 15}
+              value={settings.halftimeSponsorSeconds ?? 30}
               onChange={(e) => update("halftimeSponsorSeconds", Number(e.target.value))}
             />
-            <small>Tempo de cada arte no carousel do intervalo.</small>
+            <small>
+              Tempo único no intervalo/timeout (todos os níveis). A prioridade continua Master → Amigo.
+            </small>
           </div>
           <div className="field">
             <label>Tema</label>
